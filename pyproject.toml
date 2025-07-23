@@ -1,0 +1,54 @@
+[project]
+name = "viralQA"
+version = "1.0.0"
+description = "A tool andpackage for quality assurance of consensus virus genomes."
+authors = [
+    { name = "Filipe Zimmer Dezordi", email = "zimmer.filipe@gmail.com" }
+]
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+dependencies = [
+    "typer>=0.16",
+    "fastapi>=0.116",
+    "uvicorn[standard]>=0.35",
+    "colorlog>=6.3"
+]
+
+keywords = ["virus", "quality-assurance", "python", "snakemake"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities"
+]
+
+[project.optional-dependencies]
+cli = [
+    "typer>=0.16",
+    "colorlog>=6.3"
+]
+api = [
+    "fastapi>=0.116",
+    "uvicorn[standard]>=0.35"
+]
+all = [
+    "vqa[cli,api]"
+]
+dev = [
+    "black>=24.3",
+    "pytest>=8.0",
+]
+
+[project.scripts]
+vqa = "viralqa.cli:app"
+vqa-server = "viralqa.api:start"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.setuptools.package-data]
+viralqa = ["config/nextclade_datasets.yml"]
