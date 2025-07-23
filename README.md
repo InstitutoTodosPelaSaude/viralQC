@@ -39,7 +39,7 @@ Go to `http://127.0.0.1:8000/docs`
 
 ### Development
 
-Install development dependencies and run `black` into `viral` directory.
+Install development dependencies and run `black` into `viralqa` directory.
 
 ```bash
 pip install -e ".[dev]"
