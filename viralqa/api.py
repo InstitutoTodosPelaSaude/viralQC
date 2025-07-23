@@ -1,5 +1,3 @@
-# multicalc/api.py
-
 from fastapi import FastAPI, Query, HTTPException
 from viralqa.core.datasets import GetNextcladeDatasets
 from viralqa.core.errors import SnakemakeExecutionFailed
