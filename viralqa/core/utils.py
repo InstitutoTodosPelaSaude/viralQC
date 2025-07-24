@@ -8,7 +8,10 @@ from viralqa.core.models import SnakemakeResponse, RunStatus
 def _get_log_and_run_id_from_log(log_lines: str) -> Tuple[str, Optional[str]]:
     last_line = log_lines.strip().split("\n")[-1]
     match = re.search(r"\d{4}-\d{2}-\d{2}T\d{6}\.\d+", last_line)
-    log_path = re.sub("Complete log: ", "", last_line)
+    if "Complete log" in last_line:
+        log_path = re.sub("Complete log: ", "", last_line)
+    else:
+        log_path = "This execution has no log file."
     run_id = match.group() if match else None
     return log_path, run_id
 
