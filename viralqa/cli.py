@@ -6,7 +6,6 @@ from viralqa import GET_NC_PUBLIC_DATASETS_SNK_PATH, GET_NC_PUBLIC_DATASETS_CONF
 # core config
 get_nc_datasets = GetNextcladeDatasets()
 
-
 # log config
 handler = colorlog.StreamHandler()
 handler.setLevel(logging.DEBUG)
@@ -35,13 +34,15 @@ def get_nextclade_datasets(
     cores: int = 1,
 ):
     """Get Nextclade virus dataset"""
-    try:
-        message = get_nc_datasets.get_public_dataset(
-            snk_file=snk_file_path, config_file=config_file_path, cores=cores
-        )
-        logger.info(message)
-    except Exception as err:
-        logger.error(err)
+    snakemake_response = get_nc_datasets.get_public_dataset(
+        snk_file=snk_file_path, config_file=config_file_path, cores=cores
+    )
+    if snakemake_response.status == 200:
+        logger.info(snakemake_response.format_log())
+        logger.info("Nextclade public datasets successfully retrieved.")
+    else:
+        logger.error(snakemake_response.format_log())
+        logger.error("Failed to retrieve Nextclade public datasets.")
 
 
 @app.command()

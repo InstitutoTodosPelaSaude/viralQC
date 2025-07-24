@@ -19,16 +19,16 @@ def root():
 @app.get("/get_nextclade_datasets")
 def get_nextclade_datasets(cores: int = Query(...)):
     """Get nextclade datasets"""
-    try:
-        message = get_nc_datasets.get_public_dataset(
-            snk_file=GET_NC_PUBLIC_DATASETS_SNK_PATH,
-            config_file=GET_NC_PUBLIC_DATASETS_CONFIG_PATH,
-            cores=cores,
-        )
-        return {"result": message}
-    except SnakemakeExecutionFailed as e:
+    snakemake_response = get_nc_datasets.get_public_dataset(
+        snk_file=GET_NC_PUBLIC_DATASETS_SNK_PATH,
+        config_file=GET_NC_PUBLIC_DATASETS_CONFIG_PATH,
+        cores=cores,
+    )
+    if snakemake_response.status == 200:
+        return {"result": snakemake_response.format_log()}
+    else:
         raise HTTPException(
-            status_code=500, detail=f"Snakemake execution error: {str(e.log)}"
+            status_code=500, detail=f"Snakemake execution error: {str(snakemake_response.format_log())}"
         )
 
 
