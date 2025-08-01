@@ -1,0 +1,14 @@
+.venv/
+.venv
+
+# Python build outputs
+dist/
+build/
+*.egg-info/
+.DS_Store
+
+# Snakemake and test outputs
+.snakemake/
+tests/
+datasets/
+__pycache__/
