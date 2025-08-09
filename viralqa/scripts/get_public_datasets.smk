@@ -10,7 +10,7 @@ parameters = rules.parameters.params
 
 rule all:
     input:
-        datasets = expand(f"{parameters.datasets_dir}/{{virus}}/README.md", virus=parameters.viruses),
+        readmes = expand(f"{parameters.datasets_dir}/{{virus}}/README.md", virus=parameters.viruses),
         changelogs = expand(f"{parameters.datasets_dir}/{{virus}}/CHANGELOG.md", virus=parameters.viruses),
         genome_annotations = expand(f"{parameters.datasets_dir}/{{virus}}/genome_annotation.gff3", virus=parameters.viruses),
         pathogen_configs = expand(f"{parameters.datasets_dir}/{{virus}}/pathogen.json", virus=parameters.viruses),
