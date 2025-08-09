@@ -1,5 +1,5 @@
 import io, contextlib, re
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 from snakemake import snakemake
 from viralqa.core.errors import SnakemakeExecutionFailed
 from viralqa.core.models import SnakemakeResponse, RunStatus
@@ -16,7 +16,12 @@ def _get_log_and_run_id_from_log(log_lines: str) -> Tuple[str, Optional[str]]:
     return log_path, run_id
 
 
-def run_snakemake(snk_file: str, config_file: str, cores: int) -> SnakemakeResponse:
+def run_snakemake(
+    snk_file: str,
+    config_file: Optional[List[str]] = None,
+    cores: int = 1,
+    config: dict = None,
+) -> SnakemakeResponse:
     """
     The snakemake module has runtime logic that must be handled with viralQA
     modularization patterns, including:
@@ -33,7 +38,11 @@ def run_snakemake(snk_file: str, config_file: str, cores: int) -> SnakemakeRespo
     stdout_buf = io.StringIO()
     with contextlib.redirect_stderr(stdout_buf):
         successful = snakemake(
-            snk_file, configfiles=[config_file], cores=cores, targets=["all"]
+            snk_file,
+            config=config,
+            configfiles=config_file,
+            cores=cores,
+            targets=["all"],
         )
         stdout = stdout_buf.getvalue()
         log_path, run_id = _get_log_and_run_id_from_log(stdout)

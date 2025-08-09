@@ -1,10 +1,19 @@
 import typer, logging, colorlog
 from typing import Optional
-from viralqa.core.datasets import GetNextcladeDatasets
-from viralqa import GET_NC_PUBLIC_DATASETS_SNK_PATH, GET_NC_PUBLIC_DATASETS_CONFIG_PATH
+from enum import Enum
+from viralqa.core.datasets import GetNextcladeDatasets, GetBlastDatabase
+from viralqa.core.run_nextclade import RunNextclade
+from viralqa import (
+    DATASETS_CONFIG_PATH,
+    GET_NC_PUBLIC_DATASETS_SNK_PATH,
+    GET_BLAST_DB_SNK_PATH,
+    RUN_NEXTCLADE_SNK_PATH,
+)
 
 # core config
 get_nc_datasets = GetNextcladeDatasets()
+get_blast_db = GetBlastDatabase()
+run_nextclade = RunNextclade()
 
 # log config
 handler = colorlog.StreamHandler()
@@ -25,17 +34,27 @@ logger.addHandler(handler)
 
 # cli config
 app = typer.Typer()
+if __name__ == "__main__":
+    app()
 
 
 @app.command()
 def get_nextclade_datasets(
+    datasets_dir: str = typer.Option(
+        "datasets",
+        "--datasets-dir",
+        help="Directory to store local nextclade datasets.",
+    ),
     snk_file_path: Optional[str] = GET_NC_PUBLIC_DATASETS_SNK_PATH,
-    config_file_path: Optional[str] = GET_NC_PUBLIC_DATASETS_CONFIG_PATH,
+    config_file_path: Optional[str] = DATASETS_CONFIG_PATH,
     cores: int = 1,
 ):
-    """Get Nextclade virus dataset"""
+    """Get Nextclade virus datasets"""
     snakemake_response = get_nc_datasets.get_public_dataset(
-        snk_file=snk_file_path, config_file=config_file_path, cores=cores
+        datasets_dir=datasets_dir,
+        snk_file=snk_file_path,
+        config_file=config_file_path,
+        cores=cores,
     )
     if snakemake_response.status == 200:
         logger.info(snakemake_response.format_log())
@@ -47,9 +66,97 @@ def get_nextclade_datasets(
 
 @app.command()
 def get_custom_datasets(cores: int = 1):
-    """Get custom virus dataset"""
+    """Get custom virus datasets"""
     print("In progress")
 
 
-if __name__ == "__main__":
-    app()
+@app.command()
+def get_blast_database(
+    datasets_dir: str = typer.Option(
+        "datasets",
+        "--datasets-dir",
+        help="Path to local directory containing nextclade datasets.",
+    ),
+    output_dir: str = typer.Option(
+        "datasets",
+        "--output-dir",
+        help="Path to store BLAST database.",
+    ),
+    snk_file_path: Optional[str] = GET_BLAST_DB_SNK_PATH,
+    cores: int = 1,
+):
+    """Create BLAST database based on references from nextclade datasets"""
+    snakemake_response = get_blast_db.get_database(
+        datasets=datasets_dir,
+        output_dir=output_dir,
+        snk_file=snk_file_path,
+        cores=cores,
+    )
+    if snakemake_response.status == 200:
+        logger.info(snakemake_response.format_log())
+        logger.info("BLAST database created.")
+    else:
+        logger.error(snakemake_response.format_log())
+        logger.error("Failed to create BLAST database.")
+
+
+class SortChoices(str, Enum):
+    nextclade = ("nextclade",)
+    blast = "blast"
+
+@app.command()
+def run_from_fasta(
+    sequences_fasta: str = typer.Option(
+        ..., "--sequences-fasta", help="Path to the input FASTA file."
+    ),
+    sort_mode: SortChoices = typer.Option(
+        SortChoices.nextclade,
+        "--sort-mode",
+        help="Tool used to identify virus into input sequences.",
+    ),
+    output_dir: str = typer.Option(
+        "output", "--output-dir", help="Directory to write output files."
+    ),
+    datasets_dir: str = typer.Option(
+        "datasets",
+        "--datasets-dir",
+        help="Path to local directory containing nextclade datasets.",
+    ),
+    nextclade_sort_min_score: float = typer.Option(
+        0.1,
+        "--ns-min-score",
+        help="Nextclade sort min score. Used only in sort-mode = nextclade.",
+    ),
+    nextclade_sort_min_hits: int = typer.Option(
+        10,
+        "--ns-min-hits",
+        help="Nextclade sort min hits. Used only in sort-mode = nextclade.",
+    ),
+    blast_database: str = typer.Option(
+        "datasets/viruses.fa",
+        "--blast-database",
+        help="Path to local blast database. Used only in sort-mode = blast.",
+    ),
+    config_file_path: Optional[str] = DATASETS_CONFIG_PATH,
+    snk_file_path: Optional[str] = RUN_NEXTCLADE_SNK_PATH,
+    cores: int = 1,
+):
+    """Split sequences by viruses and run nextclade for each virus."""
+    snakemake_response = run_nextclade.run(
+        snk_file=snk_file_path,
+        config_file=config_file_path,
+        cores=cores,
+        sequences_fasta=sequences_fasta,
+        sort_mode=sort_mode,
+        output_dir=output_dir,
+        datasets_local_path=datasets_dir,
+        nextclade_sort_min_score=nextclade_sort_min_score,
+        nextclade_sort_min_hits=nextclade_sort_min_hits,
+        blast_database=blast_database,
+    )
+    if snakemake_response.status == 200:
+        logger.info(snakemake_response.format_log())
+        logger.info("Nextclade run with success.")
+    else:
+        logger.error(snakemake_response.format_log())
+        logger.error("Failed to run nextclade.")

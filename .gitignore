@@ -10,5 +10,6 @@ build/
 # Snakemake and test outputs
 .snakemake/
 tests/
+estudo_ref/
 datasets/
 __pycache__/

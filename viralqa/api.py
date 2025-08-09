@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Query, HTTPException
 from viralqa.core.datasets import GetNextcladeDatasets
-from viralqa.core.errors import SnakemakeExecutionFailed
-from viralqa import GET_NC_PUBLIC_DATASETS_SNK_PATH, GET_NC_PUBLIC_DATASETS_CONFIG_PATH
+from viralqa import GET_NC_PUBLIC_DATASETS_SNK_PATH, DATASETS_CONFIG_PATH
 
 app = FastAPI(
     title="ViralQA Example API",
@@ -20,15 +19,17 @@ def root():
 def get_nextclade_datasets(cores: int = Query(...)):
     """Get nextclade datasets"""
     snakemake_response = get_nc_datasets.get_public_dataset(
+        datasets_dir="datasets",
         snk_file=GET_NC_PUBLIC_DATASETS_SNK_PATH,
-        config_file=GET_NC_PUBLIC_DATASETS_CONFIG_PATH,
+        config_file=DATASETS_CONFIG_PATH,
         cores=cores,
     )
     if snakemake_response.status == 200:
         return {"result": snakemake_response.format_log()}
     else:
         raise HTTPException(
-            status_code=500, detail=f"Snakemake execution error: {str(snakemake_response.format_log())}"
+            status_code=500,
+            detail=f"Snakemake execution error: {str(snakemake_response.format_log())}",
         )
 
 

@@ -1,42 +1,48 @@
 denv1:
   dataset: "community/v-gen-lab/dengue/denv1"
   tag: "2025-04-02--19-11-08Z"
-  genome_cov: 0.8
+  genome_cov: 0.7
   target_gene: "E"
   target_gene_cov: 0.95
 denv2:
   dataset: "community/v-gen-lab/dengue/denv2"
   tag: "2025-03-26--11-47-13Z"
-  genome_cov: 0.8
+  genome_cov: 0.7
   target_gene: "E"
   target_gene_cov: 0.95
 denv3:
   dataset: "community/v-gen-lab/dengue/denv3"
   tag: "2025-03-26--11-47-13Z"
-  genome_cov: 0.8
+  genome_cov: 0.7
   target_gene: "E"
   target_gene_cov: 0.95
 denv4:
   dataset: "community/v-gen-lab/dengue/denv4"
   tag: "2025-03-26--11-47-13Z"
-  genome_cov: 0.8
+  genome_cov: 0.7
   target_gene: "E"
   target_gene_cov: 0.95
-sarscov2:
-  dataset: "nextstrain/sars-cov-2/wuhan-hu-1"
+sarscov2-wuhan:
+  dataset: "nextstrain/sars-cov-2/wuhan-hu-1/orfs"
   tag: "2025-06-09--15-42-38Z"
-  genome_cov: 0.9
+  genome_cov: 0.7
   target_gene: "S"
-  target_gene_cov: 0.98
+  target_gene_cov: 0.95
+sarscov2-ba:
+  dataset: "nextstrain/sars-cov-2/BA.2.86"
+  tag: "2025-06-09--15-42-38Z"
+  genome_cov: 0.7
+  target_gene: "S"
+  target_gene_cov: 0.95
 rsva:
   dataset: "nextstrain/rsv/a/EPI_ISL_412866"
   tag: "2024-11-27--02-51-00Z"
   genome_cov: 0.9
-  target_gene: "L"
-  target_gene_cov: 0.90
+  target_gene: ["G","F"]
+  target_gene_cov: 0.95
 rsvb:
   dataset: "nextstrain/rsv/b/EPI_ISL_1653999"
   tag: "2025-03-04--17-31-25Z"
   genome_cov: 0.9
-  target_gene: "L"
-  target_gene_cov: 0.90
+  target_gene: ["G","F"]
+  target_gene_cov: 0.95
