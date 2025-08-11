@@ -104,6 +104,7 @@ class SortChoices(str, Enum):
     nextclade = ("nextclade",)
     blast = "blast"
 
+
 @app.command()
 def run_from_fasta(
     sequences_fasta: str = typer.Option(
