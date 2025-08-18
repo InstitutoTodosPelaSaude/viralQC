@@ -42,7 +42,7 @@ This command runs several steps to identify viruses represented in the input FAS
     - nextclade (default): Run `nextclade sort`
     - blast: Run `blastn`.
 
-#### run-fron-fasta (nextclade)
+#### run-from-fasta (nextclade)
 
 ```bash
 vqa run-from-fasta --sequences-fasta <fasta_file>
@@ -66,7 +66,7 @@ The output directory has the following structure:
 └── viruses.tsv                   # Nextclade sort output showing the mapping between input sequences and remote
 ```
 
-#### run-fron-fasta (nextclade)
+#### run-from-fasta (nextclade)
 
 For a run-from-fasta analysis using BLAST to identify the corresponding virus, a BLAST database must first be created:
 

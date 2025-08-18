@@ -15,9 +15,9 @@ class RunNextclade:
         sort_mode: str,
         output_dir: str,
         datasets_local_path: str,
-        nextclade_sort_min_score=float,
-        nextclade_sort_min_hits=int,
-        blast_database=str,
+        nextclade_sort_min_score: float,
+        nextclade_sort_min_hits: int,
+        blast_database: str,
     ) -> SnakemakeResponse:
         config = {
             "sequences_fasta": sequences_fasta,

@@ -37,12 +37,12 @@ sarscov2-ba:
 rsva:
   dataset: "nextstrain/rsv/a/EPI_ISL_412866"
   tag: "2024-11-27--02-51-00Z"
-  genome_cov: 0.9
+  genome_cov: 0.7
   target_gene: ["G","F"]
   target_gene_cov: 0.95
 rsvb:
   dataset: "nextstrain/rsv/b/EPI_ISL_1653999"
   tag: "2025-03-04--17-31-25Z"
-  genome_cov: 0.9
+  genome_cov: 0.7
   target_gene: ["G","F"]
   target_gene_cov: 0.95
