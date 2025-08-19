@@ -118,6 +118,9 @@ def run_from_fasta(
     output_dir: str = typer.Option(
         "output", "--output-dir", help="Directory to write output files."
     ),
+    output_file: str = typer.Option(
+        "results.tsv", "--output-file", help="File to write final results. Valid extensions: .csv, .tsv or .json"
+    ),
     datasets_dir: str = typer.Option(
         "datasets",
         "--datasets-dir",
@@ -150,6 +153,7 @@ def run_from_fasta(
         sequences_fasta=sequences_fasta,
         sort_mode=sort_mode,
         output_dir=output_dir,
+        output_file=output_file,
         datasets_local_path=datasets_dir,
         nextclade_sort_min_score=nextclade_sort_min_score,
         nextclade_sort_min_hits=nextclade_sort_min_hits,

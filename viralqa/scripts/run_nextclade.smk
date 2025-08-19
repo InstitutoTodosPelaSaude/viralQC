@@ -5,7 +5,9 @@ rule parameters:
     params:
         sequences_fasta = config["sequences_fasta"],
         sort_mode = config["sort_mode"],
-        output_dir  = config["output_dir"],
+        output_dir = config["output_dir"],
+        output_file = config["output_file"],
+        output_format = config["output_format"],
         config_file = config["config_file"],
         datasets_local_path = config["datasets_local_path"],
         nextclade_sort_min_score = config["nextclade_sort_min_score"],
@@ -37,7 +39,8 @@ rule all:
         viruses_identified = f"{parameters.output_dir}/viruses.tsv",
         datasets_selected = f"{parameters.output_dir}/datasets_selected.tsv",
         unmapped_sequences = f"{parameters.output_dir}/unmapped_sequences.txt",
-        nextclade_outputs = get_nextclade_outputs
+        nextclade_outputs = get_nextclade_outputs,
+        output = f"{parameters.output_dir}/{parameters.output_file}"
 
 if parameters.sort_mode == "nextclade":
     rule nextclade_sort:
@@ -206,4 +209,25 @@ rule nextclade:
             --output-tsv {output.nextclade_tsv} \
             --jobs {threads} \
             {input.fasta} 2>{log}
+        """
+
+rule post_process_nextclade:
+    message:
+        "Process nextclade outputs"
+    input:
+        nextclade_results = get_nextclade_outputs,
+        config_file = parameters.config_file
+    params:
+        output_format = parameters.output_format
+    output:
+        output_file = f"{parameters.output_dir}/{parameters.output_file}"
+    log:
+        "logs/pp_nextclade.log"
+    shell:
+        """
+        python {PKG_PATH}/scripts/python/post_process_nextclade.py \
+            --files {input.nextclade_results} \
+            --config-file {input.config_file} \
+            --output {output.output_file} \
+            --output-format {params.output_format}
         """
