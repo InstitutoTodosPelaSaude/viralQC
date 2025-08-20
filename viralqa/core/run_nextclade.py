@@ -2,11 +2,12 @@ from viralqa.core.utils import run_snakemake
 from viralqa.core.models import SnakemakeResponse
 from viralqa.core.errors import InvalidOutputFormat
 
+
 class RunNextclade:
     def __init__(self):
         pass
-    
-    def _get_output_format(self, output_file:str) -> str | InvalidOutputFormat:
+
+    def _get_output_format(self, output_file: str) -> str | InvalidOutputFormat:
         file_extension = output_file.split(".")[-1]
         if file_extension not in ["csv", "tsv", "json"]:
             raise InvalidOutputFormat(file_extension)

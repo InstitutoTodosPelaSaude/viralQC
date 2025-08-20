@@ -119,7 +119,9 @@ def run_from_fasta(
         "output", "--output-dir", help="Directory to write output files."
     ),
     output_file: str = typer.Option(
-        "results.tsv", "--output-file", help="File to write final results. Valid extensions: .csv, .tsv or .json"
+        "results.tsv",
+        "--output-file",
+        help="File to write final results. Valid extensions: .csv, .tsv or .json",
     ),
     datasets_dir: str = typer.Option(
         "datasets",

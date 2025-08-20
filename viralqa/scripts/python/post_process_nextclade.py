@@ -18,33 +18,33 @@ TARGET_COLUMNS = {
     "targetGene": str,
     "genomeQuality": str,
     "targetRegionsQuality": str,
-    "qc.overallScore": float,
+    "qc.overallScore": "float64",
     "qc.overallStatus": str,
-    "totalSubstitutions": int,
-    "totalDeletions": int,
-    "totalInsertions": int,
-    "totalFrameShifts": int,
-    "totalMissing": int,
-    "totalNonACGTNs": int,
-    "totalAminoacidSubstitutions": int,
-    "totalAminoacidDeletions": int,
-    "totalAminoacidInsertions": int,
-    "totalUnknownAa": int,
-    "coverage": float,
+    "totalSubstitutions": "Int64",
+    "totalDeletions": "Int64",
+    "totalInsertions": "Int64",
+    "totalFrameShifts": "Int64",
+    "totalMissing": "Int64",
+    "totalNonACGTNs": "Int64",
+    "totalAminoacidSubstitutions": "Int64",
+    "totalAminoacidDeletions": "Int64",
+    "totalAminoacidInsertions": "Int64",
+    "totalUnknownAa": "Int64",
+    "coverage": "float64",
     "targetCdsCoverage": str,
     "isReverseComplement": bool,
     "qc.missingData.missingDataThreshold": "float64",
     "qc.missingData.score": "float64",
     "qc.missingData.status": str,
-    "qc.missingData.totalMissing": "float64",
+    "qc.missingData.totalMissing": "Int64",
     "qc.snpClusters.score": "float64",
     "qc.snpClusters.status": str,
-    "qc.snpClusters.totalSNPs": "float64",
-    "qc.frameShifts.totalFrameShifts": "float64",
-    "qc.frameShifts.totalFrameShiftsIgnored": "float64",
+    "qc.snpClusters.totalSNPs": "Int64",
+    "qc.frameShifts.totalFrameShifts": "Int64",
+    "qc.frameShifts.totalFrameShiftsIgnored": "Int64",
     "qc.frameShifts.score": "float64",
     "qc.frameShifts.status": str,
-    "qc.stopCodons.totalStopCodons": "float64",
+    "qc.stopCodons.totalStopCodons": "Int64",
     "qc.stopCodons.score": "float64",
     "qc.stopCodons.status": str,
     "failedCdses": str,
@@ -171,6 +171,22 @@ def format_dfs(files: list[str], config_file: Path) -> list[DataFrame]:
     return dfs
 
 
+def create_unmapped_df(unmapped_sequences: Path) -> DataFrame:
+    """
+    Create a dataframe of unmapped sequences
+
+    Args:
+        unmapped_sequences: Path to unmapped_sequences.txt file
+    Returns:
+        A dataframe of unmapped sequences.
+    """
+    with open(unmapped_sequences, "r") as f:
+        data = [(line.strip(), "Unclassified") for line in f]
+
+    df = DataFrame(data, columns=["seqName", "virus"])
+    return df
+
+
 def write_combined_df(
     dfs: list[DataFrame], output_file: Path, output_format: str
 ) -> None:
@@ -186,7 +202,11 @@ def write_combined_df(
         Nothing
     """
     combined_df = concat(dfs, ignore_index=True)
-    final_df = combined_df[TARGET_COLUMNS.keys()].astype(TARGET_COLUMNS)
+    final_df = (
+        combined_df[TARGET_COLUMNS.keys()]
+        .astype(TARGET_COLUMNS)
+        .sort_values(by=["virus"])
+    )
 
     if output_format == "tsv":
         final_df.to_csv(output_file, sep="\t", index=False, header=True)
@@ -206,6 +226,12 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--files", nargs="+", help="List of Nextclade output .tsv files"
+    )
+    parser.add_argument(
+        "--unmapped-sequences",
+        type=Path,
+        required=True,
+        help="Path to the unmapped_sequences.txt file.",
     )
     parser.add_argument(
         "--config-file",
@@ -229,4 +255,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     formatted_dfs = format_dfs(args.files, args.config_file)
+    unmapped_df = create_unmapped_df(args.unmapped_sequences)
+    formatted_dfs.append(unmapped_df)
     write_combined_df(formatted_dfs, args.output, args.output_format)

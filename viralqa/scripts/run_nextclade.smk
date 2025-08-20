@@ -216,6 +216,7 @@ rule post_process_nextclade:
         "Process nextclade outputs"
     input:
         nextclade_results = get_nextclade_outputs,
+        unmapped_sequences = f"{parameters.output_dir}/unmapped_sequences.txt",
         config_file = parameters.config_file
     params:
         output_format = parameters.output_format
@@ -227,7 +228,8 @@ rule post_process_nextclade:
         """
         python {PKG_PATH}/scripts/python/post_process_nextclade.py \
             --files {input.nextclade_results} \
+            --unmapped-sequences {input.unmapped_sequences} \
             --config-file {input.config_file} \
             --output {output.output_file} \
-            --output-format {params.output_format}
+            --output-format {params.output_format} 2>{log}
         """

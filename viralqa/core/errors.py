@@ -7,6 +7,7 @@ class SnakemakeExecutionFailed(Exception):
         msg = f"Snakemake run of {script} failed"
         super().__init__(msg)
 
+
 class InvalidOutputFormat(Exception):
     """
     Raised when an unexpected output format is parsed.
