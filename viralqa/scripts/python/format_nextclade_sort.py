@@ -72,6 +72,13 @@ def format_nextclade_output(tsv_file: Path, local_map: dict[str, Path]) -> DataF
 def write_unmapped_sequences(formatted_df: DataFrame, output_dir: Path) -> None:
     """
     Identify sequences without a mapped dataset and write their names to a file.
+
+    Args:
+        formatted_df: Dataframe formatted by format_nextclade_output function
+        output_dir: Output directory name.
+
+    Returns:
+        Nothing
     """
     output_dir.mkdir(parents=True, exist_ok=True)
     unmapped_file = output_dir / "unmapped_sequences.txt"
