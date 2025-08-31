@@ -45,7 +45,7 @@ This command runs several steps to identify viruses represented in the input FAS
 #### run-from-fasta (nextclade)
 
 ```bash
-vqc run-from-fasta --sequences-fasta <fasta_file>
+vqc run-from-fasta --sequences-fasta test_data/sequences.fasta
 ```
 
 Some parameters can be specified:
@@ -84,7 +84,7 @@ Some parameters can be specified:
 Then:
 
 ```bash
-vqc run-from-fasta --sequences-fasta <fasta_file> --sort-mode blast 
+vqc run-from-fasta --sequences-fasta test_data/sequences.fasta --sort-mode blast
 ```
 
 Some parameters can be specified:
@@ -113,9 +113,9 @@ Go to `http://127.0.0.1:8000/docs`
 
 ### Development
 
-Install development dependencies and run `black` into `viralQC` directory.
+Install development dependencies and run `black` into `viralqc` directory.
 
 ```bash
 pip install -e ".[dev]"
-black viralQC
+black viralqc
 ```

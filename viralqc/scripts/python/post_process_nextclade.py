@@ -15,9 +15,14 @@ TARGET_COLUMNS = {
     "seqName": str,
     "virus": str,
     "clade": str,
+    "targetRegions": str,
     "targetGene": str,
     "genomeQuality": str,
     "targetRegionsQuality": str,
+    "targetGeneQuality": str,
+    "coverage": "float64",
+    "targetGeneCoverage": str,
+    "targetRegionsCoverage": str,
     "qc.overallScore": "float64",
     "qc.overallStatus": str,
     "totalSubstitutions": "Int64",
@@ -30,8 +35,6 @@ TARGET_COLUMNS = {
     "totalAminoacidDeletions": "Int64",
     "totalAminoacidInsertions": "Int64",
     "totalUnknownAa": "Int64",
-    "coverage": "float64",
-    "targetCdsCoverage": str,
     "isReverseComplement": bool,
     "qc.missingData.missingDataThreshold": "float64",
     "qc.missingData.score": "float64",
@@ -84,7 +87,10 @@ def _parse_cds_cov(cds_list: str) -> list[dict[str, float]]:
 
 
 def get_target_regions_quality(
-    cds_coverage: str, target_regions: list, target_regions_cov: float
+    cds_coverage: str,
+    genome_quality: str,
+    target_regions: list,
+    target_regions_cov: float,
 ) -> str:
     """
     Evaluate the quality of target regions. If any region has coverage
@@ -92,21 +98,26 @@ def get_target_regions_quality(
 
     Args:
         cds_coverage: Value of the 'cdsCoverage' column from the Nextclade output.
+        genome_quality: Quality of genome.
         target_regions: List of target regions.
         target_regions_cov: Minimum required coverage for target regions.
 
     Returns:
         The status of the target regions.
     """
-    cds_coverage = _parse_cds_cov(cds_coverage)
-    if all(
-        cds_coverage.get(region, 0) >= target_regions_cov for region in target_regions
-    ):
-        region_status = "good"
-    else:
-        region_status = "bad"
+    if genome_quality in ["good", ""]:
+        return ""
 
-    return region_status
+    cds_coverage = _parse_cds_cov(cds_coverage)
+    coverages = []
+    for region in target_regions:
+        coverages.append(float(cds_coverage.get(region, 0)))
+    mean_coverage = sum(coverages) / len(coverages)
+
+    if mean_coverage >= target_regions_cov:
+        return "good"
+
+    return "bad"
 
 
 def get_target_regions_coverage(cds_coverage: str, target_regions: list[str]) -> str:
@@ -152,19 +163,50 @@ def format_dfs(files: list[str], config_file: Path) -> list[DataFrame]:
         df["virus"] = virus_info["virus_tag"]
         df["dataset"] = virus_info["dataset"]
         df["datasetVersion"] = virus_info["tag"]
-        df["targetGene"] = ", ".join(virus_info["target_gene"])
+        df["targetGene"] = virus_info["target_gene"]
+        df["targetRegions"] = "-".join(virus_info["target_regions"])
         df["genomeQuality"] = df["qc.overallStatus"].apply(
             lambda x: StatusQuality[x].value if notna(x) else "missing"
         )
-        df["targetRegionsQuality"] = df["cdsCoverage"].apply(
-            lambda cds_cov: get_target_regions_quality(
-                cds_cov, virus_info["target_gene"], virus_info["target_gene_cov"]
-            ) if notna(cds_cov) else ""
+        df["targetRegionsQuality"] = df.apply(
+            lambda row: (
+                get_target_regions_quality(
+                    row["cdsCoverage"],
+                    row["genomeQuality"],
+                    virus_info["target_regions"],
+                    virus_info["target_regions_cov"],
+                )
+                if notna(row["cdsCoverage"])
+                else ""
+            ),
+            axis=1,
         )
-        df["targetCdsCoverage"] = df["cdsCoverage"].apply(
-            lambda cds_cov: get_target_regions_coverage(
-                cds_cov, virus_info["target_gene"]
-            ) if notna(cds_cov) else ""
+        df["targetRegionsCoverage"] = df["cdsCoverage"].apply(
+            lambda cds_cov: (
+                get_target_regions_coverage(cds_cov, virus_info["target_regions"])
+                if notna(cds_cov)
+                else ""
+            )
+        )
+        df["targetGeneQuality"] = df.apply(
+            lambda row: (
+                get_target_regions_quality(
+                    row["cdsCoverage"],
+                    row["targetRegionsQuality"],
+                    [virus_info["target_gene"]],
+                    virus_info["target_gene_cov"],
+                )
+                if notna(row["cdsCoverage"])
+                else ""
+            ),
+            axis=1,
+        )
+        df["targetGeneCoverage"] = df["cdsCoverage"].apply(
+            lambda cds_cov: (
+                get_target_regions_coverage(cds_cov, [virus_info["target_gene"]])
+                if notna(cds_cov)
+                else ""
+            )
         )
         dfs.append(df)
 

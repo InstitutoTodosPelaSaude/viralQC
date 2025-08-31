@@ -157,10 +157,9 @@ else:
                 {input.blast_results} >> {output.datasets_selected}
 
             # Save sequences without matches
-            
             grep ">" {input.sequences} | sed -e "s/>//g" > {params.output_dir}/tmp.sequence_ids.txt
             cut -f 1 {input.blast_results} > {params.output_dir}/tmp.sequences_with_match.txt
-            fgrep -vw -f {params.output_dir}/tmp.sequences_with_match.txt {params.output_dir}/tmp.sequence_ids.txt > {output.unmapped_sequences}
+            fgrep -vw -f {params.output_dir}/tmp.sequences_with_match.txt {params.output_dir}/tmp.sequence_ids.txt > {output.unmapped_sequences} || true
             
             rm {params.output_dir}/tmp.*
             """
