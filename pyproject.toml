@@ -1,5 +1,5 @@
 [project]
-name = "viralQA"
+name = "viralQC"
 version = "1.0.0"
 description = "A tool and package for quality assurance of consensus virus genomes."
 authors = [
@@ -36,7 +36,7 @@ api = [
     "uvicorn[standard]>=0.35"
 ]
 all = [
-    "vqa[cli,api]"
+    "vqc[cli,api]"
 ]
 dev = [
     "black>=24.3",
@@ -44,12 +44,12 @@ dev = [
 ]
 
 [project.scripts]
-vqa = "viralqa.cli:app"
-vqa-server = "viralqa.api:start"
+vqc = "viralqc.cli:app"
+vqc-server = "viralqc.api:start"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.setuptools.package-data]
-viralqa = ["config/nextclade_datasets.yml"]
+viralqc = ["config/nextclade_datasets.yml"]

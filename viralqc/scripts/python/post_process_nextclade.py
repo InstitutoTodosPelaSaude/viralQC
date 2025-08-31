@@ -1,6 +1,6 @@
 import argparse, re, csv, json
 from pathlib import Path
-from pandas import read_csv, concat, DataFrame
+from pandas import read_csv, concat, DataFrame, notna
 from yaml import safe_load
 from enum import Enum
 
@@ -154,17 +154,17 @@ def format_dfs(files: list[str], config_file: Path) -> list[DataFrame]:
         df["datasetVersion"] = virus_info["tag"]
         df["targetGene"] = ", ".join(virus_info["target_gene"])
         df["genomeQuality"] = df["qc.overallStatus"].apply(
-            lambda x: StatusQuality[x].value
+            lambda x: StatusQuality[x].value if notna(x) else "missing"
         )
         df["targetRegionsQuality"] = df["cdsCoverage"].apply(
             lambda cds_cov: get_target_regions_quality(
                 cds_cov, virus_info["target_gene"], virus_info["target_gene_cov"]
-            )
+            ) if notna(cds_cov) else ""
         )
         df["targetCdsCoverage"] = df["cdsCoverage"].apply(
             lambda cds_cov: get_target_regions_coverage(
                 cds_cov, virus_info["target_gene"]
-            )
+            ) if notna(cds_cov) else ""
         )
         dfs.append(df)
 

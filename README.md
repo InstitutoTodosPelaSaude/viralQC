@@ -4,10 +4,10 @@
 
 ```bash
 micromamba env create -f env.yml
-micromamba activate viralQA
+micromamba activate viralQC
 ```
 
-### viralQA
+### viralQC
 
 ```bash
 pip install .
@@ -16,7 +16,7 @@ pip install .
 ### Check installation (CLI)
 
 ```bash
-vqa --help
+vqc --help
 ```
 
 ## Usage (CLI)
@@ -26,13 +26,13 @@ vqa --help
 This command configures local datasets using nextclade. It is necessary to run at least once to generate a local copy of the nextclade datasets, before running the `run-from-fasta` command
 
 ```bash
-vqa get-nextclade-datasets --cores 2
+vqc get-nextclade-datasets --cores 2
 ```
 
 A directory name can be specified, the default is `datasets`.
 
 ```bash
-vqa get-nextclade-datasets --cores 2 --datasets-dir <directory_name>
+vqc get-nextclade-datasets --cores 2 --datasets-dir <directory_name>
 ```
 
 ### run-from-fasta
@@ -45,7 +45,7 @@ This command runs several steps to identify viruses represented in the input FAS
 #### run-from-fasta (nextclade)
 
 ```bash
-vqa run-from-fasta --sequences-fasta <fasta_file>
+vqc run-from-fasta --sequences-fasta <fasta_file>
 ```
 
 Some parameters can be specified:
@@ -71,7 +71,7 @@ The output directory has the following structure:
 For a run-from-fasta analysis using BLAST to identify the corresponding virus, a BLAST database must first be created:
 
 ```bash
-vqa get-blast-database
+vqc get-blast-database
 ```
 
 Some parameters can be specified:
@@ -84,7 +84,7 @@ Some parameters can be specified:
 Then:
 
 ```bash
-vqa run-from-fasta --sequences-fasta <fasta_file> --sort-mode blast 
+vqc run-from-fasta --sequences-fasta <fasta_file> --sort-mode blast 
 ```
 
 Some parameters can be specified:
@@ -106,16 +106,16 @@ The output directory has the following structure:
 ## Usage (API)
 
 ```bash
-vqa-server
+vqc-server
 ```
 
 Go to `http://127.0.0.1:8000/docs`
 
 ### Development
 
-Install development dependencies and run `black` into `viralqa` directory.
+Install development dependencies and run `black` into `viralQC` directory.
 
 ```bash
 pip install -e ".[dev]"
-black viralqa
+black viralQC
 ```

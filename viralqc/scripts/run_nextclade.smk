@@ -1,4 +1,4 @@
-from viralqa import PKG_PATH
+from viralqc import PKG_PATH
 import csv
 
 rule parameters:

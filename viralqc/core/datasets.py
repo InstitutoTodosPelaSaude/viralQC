@@ -1,5 +1,5 @@
-from viralqa.core.utils import run_snakemake
-from viralqa.core.models import SnakemakeResponse
+from viralqc.core.utils import run_snakemake
+from viralqc.core.models import SnakemakeResponse
 
 
 class GetNextcladeDatasets:

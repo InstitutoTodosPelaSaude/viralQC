@@ -1,9 +1,9 @@
 from fastapi import FastAPI, Query, HTTPException
-from viralqa.core.datasets import GetNextcladeDatasets
-from viralqa import GET_NC_PUBLIC_DATASETS_SNK_PATH, DATASETS_CONFIG_PATH
+from viralqc.core.datasets import GetNextcladeDatasets
+from viralqc import GET_NC_PUBLIC_DATASETS_SNK_PATH, DATASETS_CONFIG_PATH
 
 app = FastAPI(
-    title="ViralQA Example API",
+    title="ViralQC Example API",
     description="A demo REST API for the viralQA.",
 )
 
@@ -12,7 +12,7 @@ get_nc_datasets = GetNextcladeDatasets()
 
 @app.get("/")
 def root():
-    return {"message": "Welcome to ViralQA API!"}
+    return {"message": "Welcome to ViralQC API!"}
 
 
 @app.get("/get_nextclade_datasets")
@@ -36,4 +36,4 @@ def get_nextclade_datasets(cores: int = Query(...)):
 def start():
     import uvicorn
 
-    uvicorn.run("viralqa.api:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("viralqc.api:app", host="127.0.0.1", port=8000, reload=True)

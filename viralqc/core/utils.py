@@ -1,8 +1,8 @@
 import io, contextlib, re
 from typing import Tuple, Optional, List
 from snakemake import snakemake
-from viralqa.core.errors import SnakemakeExecutionFailed
-from viralqa.core.models import SnakemakeResponse, RunStatus
+from viralqc.core.errors import SnakemakeExecutionFailed
+from viralqc.core.models import SnakemakeResponse, RunStatus
 
 
 def _get_log_and_run_id_from_log(log_lines: str) -> Tuple[str, Optional[str]]:

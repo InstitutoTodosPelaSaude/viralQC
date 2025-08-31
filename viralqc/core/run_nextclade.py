@@ -1,6 +1,6 @@
-from viralqa.core.utils import run_snakemake
-from viralqa.core.models import SnakemakeResponse
-from viralqa.core.errors import InvalidOutputFormat
+from viralqc.core.utils import run_snakemake
+from viralqc.core.models import SnakemakeResponse
+from viralqc.core.errors import InvalidOutputFormat
 
 
 class RunNextclade:
