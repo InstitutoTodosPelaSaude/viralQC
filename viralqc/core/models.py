@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Optional, List, Union
-from viralqa.core.errors import SnakemakeExecutionFailed
+from viralqc.core.errors import SnakemakeExecutionFailed
 
 
 class RunStatus(IntEnum):

@@ -1,4 +1,4 @@
 include README.md
 include pyproject.toml
-recursive-include viralqa/config/ *.yml
-recursive-include viralqa *.py
+recursive-include viralqc/config/ *.yml
+recursive-include viralqc *.py

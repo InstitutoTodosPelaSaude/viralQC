@@ -1,9 +1,9 @@
 import typer, logging, colorlog
 from typing import Optional
 from enum import Enum
-from viralqa.core.datasets import GetNextcladeDatasets, GetBlastDatabase
-from viralqa.core.run_nextclade import RunNextclade
-from viralqa import (
+from viralqc.core.datasets import GetNextcladeDatasets, GetBlastDatabase
+from viralqc.core.run_nextclade import RunNextclade
+from viralqc import (
     DATASETS_CONFIG_PATH,
     GET_NC_PUBLIC_DATASETS_SNK_PATH,
     GET_BLAST_DB_SNK_PATH,
