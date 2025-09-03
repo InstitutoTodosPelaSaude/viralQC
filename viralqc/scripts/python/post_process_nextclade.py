@@ -82,7 +82,7 @@ def _parse_cds_cov(cds_list: str) -> list[dict[str, float]]:
     result = {}
     for p in parts:
         cds, cov = p.split(":")
-        result[cds] = float(cov)
+        result[cds] = round(float(cov), 4)
     return result
 
 
@@ -248,7 +248,7 @@ def write_combined_df(
         combined_df[TARGET_COLUMNS.keys()]
         .astype(TARGET_COLUMNS)
         .sort_values(by=["virus"])
-    )
+    ).round(4)
 
     if output_format == "tsv":
         final_df.to_csv(output_file, sep="\t", index=False, header=True)
