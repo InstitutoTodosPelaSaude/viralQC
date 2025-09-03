@@ -13,7 +13,14 @@ First, install the dependencies:
 or with micromamba
 
 ```bash
-micromamba install -c conda-forge -c bioconda "snakemake-minimal>=7.32.0,<7.33.0" "blast>=2.16.0,<2.17.0" "nextclade>=3.15.0,<3.16.0" "seqtk>=1.5.0,<1.6.0"  "python>=3.8.0,<3.12.0"
+micromamba install \
+  -c conda-forge \
+  -c bioconda \
+  "python>=3.8.0,<3.12.0" \
+  "snakemake-minimal>=7.32.0,<7.33.0" \
+  "blast>=2.16.0,<2.17.0" \
+  "nextclade>=3.15.0,<3.16.0" \
+  "seqtk>=1.5.0,<1.6.0"
 ```
 
 Then, install viralQC

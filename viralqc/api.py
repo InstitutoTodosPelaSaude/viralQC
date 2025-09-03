@@ -64,6 +64,7 @@ async def run(
     ),
     nextclade_sort_min_hits: int = Query(10, description="Nextclade sort min hits."),
 ):
+    """Run viralQC given an input fasta file."""
     output_directory = _get_tmp_dir_uuid()
     file_binary_content = await sequences_fasta.read()
     input_file = _save_input_file(file_binary_content, output_directory)
