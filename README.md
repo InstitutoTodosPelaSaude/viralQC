@@ -1,13 +1,49 @@
 ## Install
 
-### Dependencies
+### From pip
+
+First, install the dependencies:
+
+- [Snakemake 7.32](https://snakemake.readthedocs.io/en/v7.32.0/getting_started/installation.html)
+- [Ncbi-blast 2.16](https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.16.0/)
+- [Nextclade 3.15](https://docs.nextstrain.org/projects/nextclade/en/3.15.3/user/nextclade-cli/installation/)
+- [Seqtk 1.5](https://github.com/lh3/seqtk/releases/tag/v1.5)
+- [Python < 3.12](https://www.python.org/downloads/)
+
+or with micromamba
+
+```bash
+micromamba install \
+  -c conda-forge \
+  -c bioconda \
+  "python>=3.8.0,<3.12.0" \
+  "snakemake-minimal>=7.32.0,<7.33.0" \
+  "blast>=2.16.0,<2.17.0" \
+  "nextclade>=3.15.0,<3.16.0" \
+  "seqtk>=1.5.0,<1.6.0"
+```
+
+Then, install viralQC
+
+```bash
+pip install viralQC
+```
+
+### From Source
+
+```bash
+git clone https://github.com/InstitutoTodosPelaSaude/viralQC.git
+cd viralQC
+```
+
+#### Dependencies
 
 ```bash
 micromamba env create -f env.yml
 micromamba activate viralQC
 ```
 
-### viralQC
+#### viralQC
 
 ```bash
 pip install .
