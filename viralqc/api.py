@@ -73,7 +73,6 @@ async def run(
         config_file=DATASETS_CONFIG_PATH,
         cores=cores,
         sequences_fasta=input_file,
-        sort_mode="nextclade",
         output_dir=output_directory,
         output_file="results.json",
         datasets_local_path="datasets",

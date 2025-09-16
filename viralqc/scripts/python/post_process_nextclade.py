@@ -1,4 +1,4 @@
-import argparse, re, csv, json
+import argparse, re, csv, os
 from pathlib import Path
 from pandas import read_csv, concat, DataFrame, notna
 from yaml import safe_load
@@ -212,8 +212,13 @@ def format_dfs(files: list[str], config_file: Path) -> list[DataFrame]:
 
     return dfs
 
+def _format_blast_virus_name(virus_name: str) -> str:
+    formatted_virus_name = re.sub(".*_","", virus_name)
+    formatted_virus_name = re.sub("-"," ", formatted_virus_name)
 
-def create_unmapped_df(unmapped_sequences: Path) -> DataFrame:
+    return formatted_virus_name
+
+def create_unmapped_df(unmapped_sequences: Path, blast_results: Path) -> DataFrame:
     """
     Create a dataframe of unmapped sequences
 
@@ -224,9 +229,24 @@ def create_unmapped_df(unmapped_sequences: Path) -> DataFrame:
     """
     with open(unmapped_sequences, "r") as f:
         data = [(line.strip(), "Unclassified") for line in f]
-
     df = DataFrame(data, columns=["seqName", "virus"])
-    return df
+    
+    if os.path.getsize(blast_results) == 0:
+        return df
+    else:
+        blast_columns = [
+            "seqName","qlen", "virus", "slen", "qstart", "qend", "sstart",
+            "send", "evalue", "bitscore", "pident", "qcovs", "qcovhsp"
+        ]
+        blast_df = read_csv(blast_results, sep="\t", header=None, names=blast_columns)
+        blast_df_sub = blast_df[['seqName', 'virus']]
+
+        merged = df.merge(blast_df_sub, on='seqName', how='left', suffixes=('_df1', '_df2'))
+        merged['virus'] = merged['virus_df2'].combine_first(merged['virus_df1'])
+        final_df = merged[['seqName', 'virus']]
+        final_df['virus'] = final_df['virus'].apply(_format_blast_virus_name)
+
+    return final_df
 
 
 def write_combined_df(
@@ -276,6 +296,12 @@ if __name__ == "__main__":
         help="Path to the unmapped_sequences.txt file.",
     )
     parser.add_argument(
+        "--blast-results",
+        type=Path,
+        required=True,
+        help="Path to blast results of unmapped_sequences.txt.",
+    )
+    parser.add_argument(
         "--config-file",
         type=Path,
         required=True,
@@ -297,6 +323,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     formatted_dfs = format_dfs(args.files, args.config_file)
-    unmapped_df = create_unmapped_df(args.unmapped_sequences)
+    unmapped_df = create_unmapped_df(args.unmapped_sequences, args.blast_results)
     formatted_dfs.append(unmapped_df)
     write_combined_df(formatted_dfs, args.output, args.output_format)

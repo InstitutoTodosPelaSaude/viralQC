@@ -72,11 +72,6 @@ def get_custom_datasets(cores: int = 1):
 
 @app.command()
 def get_blast_database(
-    datasets_dir: str = typer.Option(
-        "datasets",
-        "--datasets-dir",
-        help="Path to local directory containing nextclade datasets.",
-    ),
     output_dir: str = typer.Option(
         "datasets",
         "--output-dir",
@@ -85,9 +80,8 @@ def get_blast_database(
     snk_file_path: Optional[str] = GET_BLAST_DB_SNK_PATH,
     cores: int = 1,
 ):
-    """Create BLAST database based on references from nextclade datasets"""
+    """Create BLAST database based on ncbi viruses refseq genomes"""
     snakemake_response = get_blast_db.get_database(
-        datasets=datasets_dir,
         output_dir=output_dir,
         snk_file=snk_file_path,
         cores=cores,
@@ -110,11 +104,6 @@ def run_from_fasta(
     sequences_fasta: str = typer.Option(
         ..., "--sequences-fasta", help="Path to the input FASTA file."
     ),
-    sort_mode: SortChoices = typer.Option(
-        SortChoices.nextclade,
-        "--sort-mode",
-        help="Tool used to identify virus into input sequences.",
-    ),
     output_dir: str = typer.Option(
         "output", "--output-dir", help="Directory to write output files."
     ),
@@ -131,17 +120,22 @@ def run_from_fasta(
     nextclade_sort_min_score: float = typer.Option(
         0.1,
         "--ns-min-score",
-        help="Nextclade sort min score. Used only in sort-mode = nextclade.",
+        help="Nextclade sort min score.",
     ),
     nextclade_sort_min_hits: int = typer.Option(
         10,
         "--ns-min-hits",
-        help="Nextclade sort min hits. Used only in sort-mode = nextclade.",
+        help="Nextclade sort min hits.",
     ),
     blast_database: str = typer.Option(
-        "datasets/viruses.fa",
+        "datasets/blast.fasta",
         "--blast-database",
-        help="Path to local blast database. Used only in sort-mode = blast.",
+        help="Path to local blast database.",
+    ),
+    identity_threshold: str = typer.Option(
+        0.90,
+        "--identity-threshold",
+        help="Identity threshold for BLAST analysis.",
     ),
     config_file_path: Optional[str] = DATASETS_CONFIG_PATH,
     snk_file_path: Optional[str] = RUN_NEXTCLADE_SNK_PATH,
@@ -153,13 +147,13 @@ def run_from_fasta(
         config_file=config_file_path,
         cores=cores,
         sequences_fasta=sequences_fasta,
-        sort_mode=sort_mode,
         output_dir=output_dir,
         output_file=output_file,
         datasets_local_path=datasets_dir,
         nextclade_sort_min_score=nextclade_sort_min_score,
         nextclade_sort_min_hits=nextclade_sort_min_hits,
         blast_database=blast_database,
+        blast_identity_threshold=identity_threshold,
     )
     if snakemake_response.status == 200:
         logger.info(snakemake_response.format_log())

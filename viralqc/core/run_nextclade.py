@@ -19,18 +19,17 @@ class RunNextclade:
         config_file: str,
         cores: int,
         sequences_fasta: str,
-        sort_mode: str,
         output_dir: str,
         output_file: str,
         datasets_local_path: str,
         nextclade_sort_min_score: float,
         nextclade_sort_min_hits: int,
         blast_database: str,
+        blast_identity_threshold: float,
     ) -> SnakemakeResponse:
         output_format = self._get_output_format(output_file)
         config = {
             "sequences_fasta": sequences_fasta,
-            "sort_mode": sort_mode,
             "output_dir": output_dir,
             "output_file": output_file,
             "output_format": output_format,
@@ -40,6 +39,7 @@ class RunNextclade:
             "nextclade_sort_min_score": nextclade_sort_min_score,
             "nextclade_sort_min_hits": nextclade_sort_min_hits,
             "blast_database": blast_database,
+            "blast_identity_threshold": blast_identity_threshold,
         }
 
         snakemake_response = run_snakemake(snk_file, [config_file], cores, config)
