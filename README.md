@@ -73,14 +73,25 @@ A directory name can be specified, the default is `datasets`.
 vqc get-nextclade-datasets --cores 2 --datasets-dir <directory_name>
 ```
 
+### get-blast-database
+
+This command configures local blast database with all ncbi refseq viral genomes. It is necessary to run at least once to generate a local blast database, before running the `run-from-fasta` command.
+
+```bash
+vqc get-blast-database --cores 2
+```
+
+A output directory name can be specified, the default is `datasets`.
+
+```bash
+vqc get-nextclade-datasets --cores 2 --output-dir <directory_name>
+```
+
 ### run-from-fasta
 
-This command runs several steps to identify viruses represented in the input FASTA file and executes Nextclade for each identified virus/dataset. There are two modes for viral identification:
+This command runs several steps to identify viruses represented in the input FASTA file and executes Nextclade for each identified virus/dataset.
 
-    - nextclade (default): Run `nextclade sort`
-    - blast: Run `blastn`.
-
-#### run-from-fasta (nextclade)
+#### run-from-fasta
 
 ```bash
 vqc run-from-fasta --sequences-fasta test_data/sequences.fasta
@@ -89,9 +100,12 @@ vqc run-from-fasta --sequences-fasta test_data/sequences.fasta
 Some parameters can be specified:
 
 - `--output-dir` — Output directory name. **Default:** `output`
+- `--output-file` - File to write final results. Valid extensions: .csv, .tsv or .json. **Default:** `results.tsv`
 - `--datasets-dir` — Path to the local Nextclade datasets directory. **Default:** `datasets`
 - `--ns-min-score` — Minimum score used by the Nextclade `sort` command. **Default:** `0.1`
 - `--ns-min-hits` — Minimum number of hits for Nextclade to consider a dataset. **Default:** `10`
+- `--blast-database` - Path to store local blast database. **Default:** `datasets/blast.fasta`
+- `--identity-threshold` - Percentual identity threshold for BLAST analysis. **Default:** `0.9`
 - `--cores` — Number of threads used in `nextclade sort` and `nextclade run`. **Default:** `1`
 
 The output directory has the following structure:
@@ -100,45 +114,9 @@ The output directory has the following structure:
 ├── <datasets>                    # Output from nextclade sort; sequences for each dataset split into sequences.fa files.
 ├── datasets_selected.tsv         # Formatted nextclade sort output showing the mapping between input sequences and local datasets.
 ├── <virus/dataset>.nextclade.tsv # Nextclade run output for each identified virus, including clade assignments and QC metrics.
-├── unmapped_sequences.txt        # Names of input sequences that were not mapped to any virus.
+├── unmapped_sequences.txt        # Names of input sequences that were not mapped to any virus on nextclade sort.
+├── unmapped_sequences.blast.tsv  # BLAST results for unmapped sequences.
 └── viruses.tsv                   # Nextclade sort output showing the mapping between input sequences and remote
-```
-
-#### run-from-fasta (nextclade)
-
-For a run-from-fasta analysis using BLAST to identify the corresponding virus, a BLAST database must first be created:
-
-```bash
-vqc get-blast-database
-```
-
-Some parameters can be specified:
-
-- `--output-dir` — Path to store the BLAST database.. **Default:** `datasets`
-- `--datasets-dir` — Path of local nextclade datasets. **Default:** `datasets`
-- `--cores` — Number of threads used in `nextclade sort` and `nextclade run`. **Default:** `1`
-
-
-Then:
-
-```bash
-vqc run-from-fasta --sequences-fasta test_data/sequences.fasta --sort-mode blast
-```
-
-Some parameters can be specified:
-
-- `--output-dir` — Output directory name. **Default:** `output`
-- `--datasets-dir` — Path to the local BLAST database directory. **Default:** `datasets`
-- `--cores` — Number of threads used in `nextclade sort` and `nextclade run`. **Default:** `1`
-
-The output directory has the following structure:
-
-```bash
-├── datasets_selected.tsv            # Mapping between input sequences and local datasets.
-├── <virus/dataset>.nextclade.tsv    # Nextclade run output for each identified virus, including clade assignments and QC metrics.
-├── sequences.<virus/dataset>.fasta  # Input sequences split by virus/dataset.
-├── unmapped_sequences.txt           # Names of input sequences that were not mapped to any virus.
-└── viruses.tsv                      # BLAST output.
 ```
 
 ## Usage (API)
