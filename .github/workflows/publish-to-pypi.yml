@@ -54,8 +54,6 @@ jobs:
 
   publish-to-testpypi:
     name: Publish Python distribution to TestPyPI
-    needs:
-    - build
     runs-on: ubuntu-latest
 
     environment:
@@ -75,7 +73,7 @@ jobs:
         python -m pip install toml-cli
         HASH=$(echo $GITHUB_SHA | cut -c1-7)
         VERSION=$(toml get --toml-path pyproject.toml project.version | tr -d '"')
-        NEW_VERSION="${VERSION}.dev0+${HASH}"
+        NEW_VERSION="${VERSION}.dev0${HASH}"
         echo "Setting version to $NEW_VERSION"
         toml set --toml-path pyproject.toml project.version "$NEW_VERSION"
     - name: Rebuild distributions with new version
