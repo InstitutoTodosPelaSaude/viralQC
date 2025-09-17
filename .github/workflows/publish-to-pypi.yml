@@ -71,6 +71,21 @@ jobs:
       with:
         name: python-package-distributions
         path: dist/
+    - name: Add commit hash to version for TestPyPI
+      run: |
+        HASH=$(echo $GITHUB_SHA | cut -c1-7)
+        VERSION=$(toml get pyproject.toml project.version | tr -d '"')
+        NEW_VERSION="${VERSION}.dev0+${HASH}"
+        echo "Setting version to $NEW_VERSION"
+        toml set pyproject.toml project.version "$NEW_VERSION" --toml-path pyproject.toml --out pyproject.toml
+        cat pyproject.toml | grep version
+
+    - name: Rebuild distributions with new version
+      run: |
+        rm -rf dist/*
+        python -m pip install build
+        python -m build
+
     - name: Publish distribution to TestPyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
