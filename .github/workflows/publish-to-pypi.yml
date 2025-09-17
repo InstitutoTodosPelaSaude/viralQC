@@ -73,8 +73,9 @@ jobs:
         path: dist/
     - name: Add commit hash to version for TestPyPI
       run: |
+        python -m pip install toml-cli
         HASH=$(echo $GITHUB_SHA | cut -c1-7)
-        VERSION=$(toml get pyproject.toml project.version | tr -d '"')
+        VERSION=$(toml get --toml-path pyproject.toml project.version | tr -d '"')
         NEW_VERSION="${VERSION}.dev0+${HASH}"
         echo "Setting version to $NEW_VERSION"
         toml set pyproject.toml project.version "$NEW_VERSION" --toml-path pyproject.toml --out pyproject.toml
