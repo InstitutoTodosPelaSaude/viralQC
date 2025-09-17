@@ -77,8 +77,7 @@ jobs:
         VERSION=$(toml get --toml-path pyproject.toml project.version | tr -d '"')
         NEW_VERSION="${VERSION}.dev0+${HASH}"
         echo "Setting version to $NEW_VERSION"
-        toml set pyproject.toml project.version "$NEW_VERSION" --toml-path pyproject.toml --out pyproject.toml
-        cat pyproject.toml | grep version
+        toml set --toml-path pyproject.toml project.version "$NEW_VERSION"
     - name: Rebuild distributions with new version
       run: |
         rm -rf dist/*
