@@ -72,6 +72,7 @@ jobs:
       run: |
         if [ "${GITHUB_REF_NAME}" != "main" ]; then
           python -m pip install toml-cli
+          VERSION=$(toml get --toml-path pyproject.toml project.version | tr -d '"')
           NEW_VERSION="${VERSION}.dev$(date +%Y%m%d%H%M%S)"
           echo "Setting version to $NEW_VERSION"
           toml set --toml-path pyproject.toml project.version "$NEW_VERSION"
