@@ -209,6 +209,10 @@ def format_dfs(files: list[str], config_file: Path) -> list[DataFrame]:
                 else ""
             )
         )
+        df["cdsCoverage"] = df["cdsCoverage"].apply(_parse_cds_cov)
+        df["cdsCoverage"] = df["cdsCoverage"].apply(
+            lambda d: ", ".join(f"{cds}: {coverage}" for cds, coverage in d.items())
+        )
         dfs.append(df)
 
     return dfs
