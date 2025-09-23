@@ -107,6 +107,7 @@ async def run(
         return {
             "log": snakemake_response.format_log(),
             "tmp_results_path": output_directory,
+            "sequences_to_submmit": f"{output_directory}/sequences_target_regions.fasta",
             "results": results_data,
         }
     else:

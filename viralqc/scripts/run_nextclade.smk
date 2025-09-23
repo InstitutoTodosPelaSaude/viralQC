@@ -40,7 +40,9 @@ rule all:
         datasets_selected = f"{parameters.output_dir}/datasets_selected.tsv",
         unmapped_sequences = f"{parameters.output_dir}/unmapped_sequences.txt",
         nextclade_outputs = get_nextclade_outputs,
-        output = f"{parameters.output_dir}/{parameters.output_file}"
+        output = f"{parameters.output_dir}/{parameters.output_file}",
+        target_regions_bed = f"{parameters.output_dir}/sequences_target_regions.bed",
+        target_regions_sequences = f"{parameters.output_dir}/sequences_target_regions.fasta"
 
 rule nextclade_sort:
     message:
@@ -160,7 +162,8 @@ rule nextclade:
         fasta = get_fasta_for_virus,
         dataset = get_dataset_for_virus
     output:
-        nextclade_tsv = f"{parameters.output_dir}/{{virus}}.nextclade.tsv"
+        nextclade_tsv = f"{parameters.output_dir}/{{virus}}.nextclade.tsv",
+        nextclade_gff = f"{parameters.output_dir}/{{virus}}.nextclade.gff"
     threads:
         parameters.threads
     log:
@@ -170,6 +173,7 @@ rule nextclade:
         nextclade run \
             --input-dataset {input.dataset} \
             --output-tsv {output.nextclade_tsv} \
+            --output-annotation-gff {output.nextclade_gff} \
             --jobs {threads} \
             {input.fasta} 2>{log}
         """
@@ -197,4 +201,31 @@ rule post_process_nextclade:
             --config-file {input.config_file} \
             --output {output.output_file} \
             --output-format {params.output_format} 2>{log}
+        """
+
+rule extract_target_regions:
+    message:
+        "Extracts the regions marked as good"
+    input:
+        sequences = parameters.sequences_fasta,
+        post_processed_data = rules.post_process_nextclade.output.output_file
+    params:
+        output_format = parameters.output_format
+    output:
+        target_regions_bed = f"{parameters.output_dir}/sequences_target_regions.bed",
+        target_regions_sequences = f"{parameters.output_dir}/sequences_target_regions.fasta"
+    threads:
+        parameters.threads
+    log:
+        "logs/extract_target_regions.log"
+    shell:
+        """
+        python {PKG_PATH}/scripts/python/extract_target_regions.py \
+            --pp-results {input.post_processed_data} \
+            --output-format {params.output_format} \
+            --output {output.target_regions_bed} 2>{log}
+
+        # Remove range values (:start-end) that seqtk subseq includes in the header.
+        seqtk subseq {input.sequences} {output.target_regions_bed} | \
+            sed -e 's/\:[0-9]*-[0-9]*$//g' > {output.target_regions_sequences} 2>{log}
         """
