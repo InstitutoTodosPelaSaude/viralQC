@@ -24,12 +24,11 @@ class GetBlastDatabase:
 
     def get_database(
         self,
-        datasets: str,
         output_dir: str,
         snk_file: str,
         cores: int,
     ) -> SnakemakeResponse:
-        config = {"datasets": datasets, "output_dir": output_dir}
+        config = {"output_dir": output_dir}
 
         snakemake_response = run_snakemake(snk_file, None, cores, config)
         return snakemake_response
