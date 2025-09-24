@@ -56,6 +56,7 @@ def get_nextclade_datasets(cores: int = Query(1, description="Number of cores to
             detail=f"Snakemake execution error: {str(snakemake_response.format_log())}",
         )
 
+
 @app.post("/get_blast_database")
 def get_blast_database(cores: int = Query(1, description="Number of cores to use")):
     """Create BLAST database based on ncbi viruses refseq genomes"""
@@ -71,6 +72,7 @@ def get_blast_database(cores: int = Query(1, description="Number of cores to use
             status_code=500,
             detail=f"Snakemake execution error: {str(snakemake_response.format_log())}",
         )
+
 
 @app.post("/run")
 async def run(

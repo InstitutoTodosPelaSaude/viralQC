@@ -83,7 +83,7 @@ def write_unmapped_sequences(formatted_df: DataFrame, output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     unmapped_file = output_dir / "unmapped_sequences.txt"
 
-    unmapped_seqs = formatted_df.loc[formatted_df["dataset"].isna(), "seqName"]
+    unmapped_seqs = formatted_df.loc[formatted_df["localDataset"].isna(), "seqName"]
     if not unmapped_seqs.empty:
         unmapped_seqs.to_csv(unmapped_file, index=False, header=False)
     else:

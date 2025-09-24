@@ -1,6 +1,6 @@
 import argparse, json
 from pathlib import Path
-from pandas import read_csv, concat, DataFrame, option_context
+from pandas import read_csv, concat, DataFrame
 from glob import glob
 from enum import Enum
 
@@ -21,23 +21,28 @@ def read_gffs(files: list[str]) -> DataFrame:
     Returns:
         A dataframe that represents the GFF file.
     """
+    column_names = [
+        "seqname",
+        "source",
+        "feature",
+        "start",
+        "end",
+        "score",
+        "strand",
+        "frame",
+        "attribute",
+    ]
+
+    if not files:
+        return DataFrame(columns=column_names)
+
     df = concat(
         (
             read_csv(
                 f,
                 delimiter="\t",
                 comment="#",
-                names=[
-                    "seqname",
-                    "source",
-                    "feature",
-                    "start",
-                    "end",
-                    "score",
-                    "strand",
-                    "frame",
-                    "attribute",
-                ],
+                names=column_names,
                 header=None,
             )
             for f in files
