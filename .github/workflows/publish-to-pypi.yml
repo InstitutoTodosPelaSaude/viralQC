@@ -68,16 +68,25 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - name: Add commit hash to version for TestPyPI
+    - name: Set version based on branch/tag
       run: |
-        if [ "${GITHUB_REF_NAME}" != "main" ]; then
-          python -m pip install toml-cli
-          VERSION=$(toml get --toml-path pyproject.toml project.version | tr -d '"')
+        python -m pip install toml-cli
+        VERSION=$(toml get --toml-path pyproject.toml project.version | tr -d '"')
+        
+        # Check if this is a tag (starts with refs/tags/), no change in version
+        if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+          echo "Tag detected: $GITHUB_REF_NAME"
+          echo "Using version from pyproject.toml: $VERSION"
+        elif [ "$GITHUB_REF_NAME" != "main" ]; then
+          # Not main branch and not a tag - use dev version
           NEW_VERSION="${VERSION}.dev$(date +%Y%m%d%H%M%S)"
-          echo "Setting version to $NEW_VERSION"
+          echo "Setting dev version: $NEW_VERSION"
           toml set --toml-path pyproject.toml project.version "$NEW_VERSION"
         else
-          echo "On main branch, keeping version $VERSION"
+          # On main branch but not a tag - use dev version to avoid conflicts
+          NEW_VERSION="${VERSION}.dev$(date +%Y%m%d%H%M%S)"
+          echo "On main branch (no tag), setting dev version: $NEW_VERSION"
+          toml set --toml-path pyproject.toml project.version "$NEW_VERSION"
         fi
     - name: Rebuild distributions with new version
       run: |
