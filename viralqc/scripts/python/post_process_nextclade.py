@@ -249,11 +249,11 @@ def create_unmapped_df(unmapped_sequences: Path, blast_results: Path) -> DataFra
             if TARGET_COLUMNS[col] == str:
                 df[col] = ""
             elif TARGET_COLUMNS[col] == "float64":
-                df[col] = 0.0
+                df[col] = None
             elif TARGET_COLUMNS[col] == "Int64":
-                df[col] = 0
+                df[col] = None
             elif TARGET_COLUMNS[col] == bool:
-                df[col] = False
+                df[col] = None
             else:
                 df[col] = ""
 
