@@ -1,6 +1,7 @@
 import argparse, re, csv, os
 from pathlib import Path
 from pandas import read_csv, concat, DataFrame, notna
+from pandas.errors import EmptyDataError
 from yaml import safe_load
 from enum import Enum
 
@@ -157,71 +158,78 @@ def format_dfs(files: list[str], config_file: Path) -> list[DataFrame]:
     dfs = []
 
     for file in files:
-        virus_dataset = re.sub("\.nextclade.tsv", "", re.sub(".*\/", "", file))
-        virus_info = config[virus_dataset]
-        df = read_csv(file, sep="\t", header=0)
-        df = format_sc2_clade(df, virus_dataset)
-        df["virus"] = virus_info["virus_tag"]
-        df["dataset"] = virus_info["dataset"]
-        df["datasetVersion"] = virus_info["tag"]
-        df["targetGene"] = virus_info["target_gene"]
-        df["targetRegions"] = "-".join(virus_info["target_regions"])
-        df["genomeQuality"] = df["qc.overallStatus"].apply(
-            lambda x: StatusQuality[x].value if notna(x) else "missing"
-        )
-        df["targetRegionsQuality"] = df.apply(
-            lambda row: (
-                get_target_regions_quality(
-                    row["cdsCoverage"],
-                    row["genomeQuality"],
-                    virus_info["target_regions"],
-                    virus_info["target_regions_cov"],
-                )
-                if notna(row["cdsCoverage"])
-                else ""
-            ),
-            axis=1,
-        )
-        df["targetRegionsCoverage"] = df["cdsCoverage"].apply(
-            lambda cds_cov: (
-                get_target_regions_coverage(cds_cov, virus_info["target_regions"])
-                if notna(cds_cov)
-                else ""
+        try:
+            df = read_csv(file, sep="\t", header=0)
+        except EmptyDataError:
+            df = DataFrame(columns=[TARGET_COLUMNS.keys()])
+
+        if not df.empty:
+            virus_dataset = re.sub("\.nextclade.tsv", "", re.sub(".*\/", "", file))
+            virus_info = config[virus_dataset]
+            df = format_sc2_clade(df, virus_dataset)
+            df["virus"] = virus_info["virus_tag"]
+            df["dataset"] = virus_info["dataset"]
+            df["datasetVersion"] = virus_info["tag"]
+            df["targetGene"] = virus_info["target_gene"]
+            df["targetRegions"] = "-".join(virus_info["target_regions"])
+            df["genomeQuality"] = df["qc.overallStatus"].apply(
+                lambda x: StatusQuality[x].value if notna(x) else "missing"
             )
-        )
-        df["targetGeneQuality"] = df.apply(
-            lambda row: (
-                get_target_regions_quality(
-                    row["cdsCoverage"],
-                    row["targetRegionsQuality"],
-                    [virus_info["target_gene"]],
-                    virus_info["target_gene_cov"],
-                )
-                if notna(row["cdsCoverage"])
-                else ""
-            ),
-            axis=1,
-        )
-        df["targetGeneCoverage"] = df["cdsCoverage"].apply(
-            lambda cds_cov: (
-                get_target_regions_coverage(cds_cov, [virus_info["target_gene"]])
-                if notna(cds_cov)
-                else ""
+            df["targetRegionsQuality"] = df.apply(
+                lambda row: (
+                    get_target_regions_quality(
+                        row["cdsCoverage"],
+                        row["genomeQuality"],
+                        virus_info["target_regions"],
+                        virus_info["target_regions_cov"],
+                    )
+                    if notna(row["cdsCoverage"])
+                    else ""
+                ),
+                axis=1,
             )
-        )
-        df["cdsCoverage"] = df["cdsCoverage"].apply(_parse_cds_cov)
-        df["cdsCoverage"] = df["cdsCoverage"].apply(
-            lambda d: ", ".join(f"{cds}: {coverage}" for cds, coverage in d.items())
-        )
+            df["targetRegionsCoverage"] = df["cdsCoverage"].apply(
+                lambda cds_cov: (
+                    get_target_regions_coverage(cds_cov, virus_info["target_regions"])
+                    if notna(cds_cov)
+                    else ""
+                )
+            )
+            df["targetGeneQuality"] = df.apply(
+                lambda row: (
+                    get_target_regions_quality(
+                        row["cdsCoverage"],
+                        row["targetRegionsQuality"],
+                        [virus_info["target_gene"]],
+                        virus_info["target_gene_cov"],
+                    )
+                    if notna(row["cdsCoverage"])
+                    else ""
+                ),
+                axis=1,
+            )
+            df["targetGeneCoverage"] = df["cdsCoverage"].apply(
+                lambda cds_cov: (
+                    get_target_regions_coverage(cds_cov, [virus_info["target_gene"]])
+                    if notna(cds_cov)
+                    else ""
+                )
+            )
+            df["cdsCoverage"] = df["cdsCoverage"].apply(_parse_cds_cov)
+            df["cdsCoverage"] = df["cdsCoverage"].apply(
+                lambda d: ", ".join(f"{cds}: {coverage}" for cds, coverage in d.items())
+            )
         dfs.append(df)
 
     return dfs
 
+
 def _format_blast_virus_name(virus_name: str) -> str:
-    formatted_virus_name = re.sub(".*_","", virus_name)
-    formatted_virus_name = re.sub("-"," ", formatted_virus_name)
+    formatted_virus_name = re.sub(".*_", "", virus_name)
+    formatted_virus_name = re.sub("-", " ", formatted_virus_name)
 
     return formatted_virus_name
+
 
 def create_unmapped_df(unmapped_sequences: Path, blast_results: Path) -> DataFrame:
     """
@@ -235,21 +243,49 @@ def create_unmapped_df(unmapped_sequences: Path, blast_results: Path) -> DataFra
     with open(unmapped_sequences, "r") as f:
         data = [(line.strip(), "Unclassified") for line in f]
     df = DataFrame(data, columns=["seqName", "virus"])
-    
+
+    for col in TARGET_COLUMNS.keys():
+        if col not in df.columns:
+            if TARGET_COLUMNS[col] == str:
+                df[col] = ""
+            elif TARGET_COLUMNS[col] == "float64":
+                df[col] = None
+            elif TARGET_COLUMNS[col] == "Int64":
+                df[col] = None
+            elif TARGET_COLUMNS[col] == bool:
+                df[col] = None
+            else:
+                df[col] = ""
+
     if os.path.getsize(blast_results) == 0:
         return df
     else:
         blast_columns = [
-            "seqName","qlen", "virus", "slen", "qstart", "qend", "sstart",
-            "send", "evalue", "bitscore", "pident", "qcovs", "qcovhsp"
+            "seqName",
+            "qlen",
+            "virus",
+            "slen",
+            "qstart",
+            "qend",
+            "sstart",
+            "send",
+            "evalue",
+            "bitscore",
+            "pident",
+            "qcovs",
+            "qcovhsp",
         ]
         blast_df = read_csv(blast_results, sep="\t", header=None, names=blast_columns)
-        blast_df_sub = blast_df[['seqName', 'virus']]
+        blast_df_sub = blast_df[["seqName", "virus"]]
 
-        merged = df.merge(blast_df_sub, on='seqName', how='left', suffixes=('_df1', '_df2'))
-        merged['virus'] = merged['virus_df2'].combine_first(merged['virus_df1'])
-        final_df = merged[['seqName', 'virus']]
-        final_df['virus'] = final_df['virus'].apply(_format_blast_virus_name)
+        merged = df.merge(
+            blast_df_sub, on="seqName", how="left", suffixes=("_df1", "_df2")
+        )
+        merged["virus"] = merged["virus_df2"].combine_first(merged["virus_df1"])
+        final_df = merged.drop(["virus_df1", "virus_df2"], axis=1)
+
+        final_df = final_df.copy()
+        final_df["virus"] = final_df["virus"].apply(_format_blast_virus_name)
 
     return final_df
 
@@ -292,7 +328,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process Nextclade output files.")
 
     parser.add_argument(
-        "--files", nargs="+", help="List of Nextclade output .tsv files"
+        "--files", nargs="*", default=[], help="List of Nextclade output .tsv files"
     )
     parser.add_argument(
         "--unmapped-sequences",

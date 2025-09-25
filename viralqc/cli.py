@@ -29,8 +29,21 @@ handler.setFormatter(
     )
 )
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 logger.addHandler(handler)
+
+
+def log_multiline(text: str):
+    for line in text.splitlines():
+        if line.startswith("WARNING:"):
+            logger.warning(line[len("WARNING:") :].strip())
+        elif line.startswith("ERROR:"):
+            logger.error(line[len("ERROR:") :].strip())
+        elif line.startswith("INFO:"):
+            logger.info(line[len("INFO:") :].strip())
+        else:
+            logger.debug(line.strip())
+
 
 # cli config
 app = typer.Typer()
@@ -57,7 +70,7 @@ def get_nextclade_datasets(
         cores=cores,
     )
     if snakemake_response.status == 200:
-        logger.info(snakemake_response.format_log())
+        log_multiline(snakemake_response.format_log())
         logger.info("Nextclade public datasets successfully retrieved.")
     else:
         logger.error(snakemake_response.format_log())
@@ -87,7 +100,7 @@ def get_blast_database(
         cores=cores,
     )
     if snakemake_response.status == 200:
-        logger.info(snakemake_response.format_log())
+        log_multiline(snakemake_response.format_log())
         logger.info("BLAST database created.")
     else:
         logger.error(snakemake_response.format_log())
@@ -156,7 +169,7 @@ def run_from_fasta(
         blast_identity_threshold=identity_threshold,
     )
     if snakemake_response.status == 200:
-        logger.info(snakemake_response.format_log())
+        log_multiline(snakemake_response.format_log())
         logger.info("Nextclade run with success.")
     else:
         logger.error(snakemake_response.format_log())

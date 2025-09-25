@@ -1,5 +1,8 @@
 from viralqc import PKG_PATH
 import csv
+import logging
+
+logging.basicConfig(level=logging.WARNING, format='%(levelname)s:%(message)s')
 
 rule parameters:
     params:
@@ -24,15 +27,29 @@ checkpoint create_datasets_selected:
     output:
         tsv = f"{parameters.output_dir}/datasets_selected.tsv"
 
+count_get_nextclade_outputs_run = 0
 def get_nextclade_outputs(wildcards):
     datasets_selected_file = checkpoints.create_datasets_selected.get(**wildcards).output.tsv
     viruses = set()
+    dataset_not_found = []
+    global count_get_nextclade_outputs_run
+
     with open(datasets_selected_file, 'r') as f:
         reader = csv.DictReader(f, delimiter='\t')
         for row in reader:
-            virus_name = row['localDataset'].split('/')[-1]
-            viruses.add(virus_name)
-    return [f"{parameters.output_dir}/{virus}.nextclade.tsv" for virus in viruses]
+            if row.get('localDataset', None):
+                virus_name = row.get('localDataset').split('/')[-1]
+                viruses.add(virus_name)
+            else:
+                if count_get_nextclade_outputs_run == 0 and row['dataset'] not in dataset_not_found:
+                    logging.warning(f"The '{row['dataset']}' dataset was not found locally.")
+                    dataset_not_found.append(row['dataset'])
+
+    nextclade_results = [f"{parameters.output_dir}/{virus}.nextclade.tsv" for virus in viruses]
+    if not nextclade_results and count_get_nextclade_outputs_run == 0:
+        logging.warning(f"Nextclade will not run for any input sequence.")
+    count_get_nextclade_outputs_run += 1
+    return nextclade_results
 
 rule all:
     input:
@@ -40,7 +57,9 @@ rule all:
         datasets_selected = f"{parameters.output_dir}/datasets_selected.tsv",
         unmapped_sequences = f"{parameters.output_dir}/unmapped_sequences.txt",
         nextclade_outputs = get_nextclade_outputs,
-        output = f"{parameters.output_dir}/{parameters.output_file}"
+        output = f"{parameters.output_dir}/{parameters.output_file}",
+        target_regions_bed = f"{parameters.output_dir}/sequences_target_regions.bed",
+        target_regions_sequences = f"{parameters.output_dir}/sequences_target_regions.fasta"
 
 rule nextclade_sort:
     message:
@@ -137,12 +156,12 @@ def get_virus_info(wildcards, field):
         with open(datasets_selected_file, 'r') as f:
             reader = csv.DictReader(f, delimiter='\t')
             for row in reader:
-                localDataset = row['localDataset']
+                localDataset = row.get('localDataset')
                 virus_name = localDataset.split('/')[-1]
                 if virus_name not in virus_info:
                     virus_info[virus_name] = {
-                        'splittedFasta': row['splittedFasta'],
-                        'localDataset': row['localDataset']
+                        'splittedFasta': row.get('splittedFasta'),
+                        'localDataset': row.get('localDataset')
                     }
 
     return virus_info[wildcards.virus][field]
@@ -160,7 +179,8 @@ rule nextclade:
         fasta = get_fasta_for_virus,
         dataset = get_dataset_for_virus
     output:
-        nextclade_tsv = f"{parameters.output_dir}/{{virus}}.nextclade.tsv"
+        nextclade_tsv = f"{parameters.output_dir}/{{virus}}.nextclade.tsv",
+        nextclade_gff = f"{parameters.output_dir}/{{virus}}.nextclade.gff"
     threads:
         parameters.threads
     log:
@@ -170,6 +190,7 @@ rule nextclade:
         nextclade run \
             --input-dataset {input.dataset} \
             --output-tsv {output.nextclade_tsv} \
+            --output-annotation-gff {output.nextclade_gff} \
             --jobs {threads} \
             {input.fasta} 2>{log}
         """
@@ -197,4 +218,31 @@ rule post_process_nextclade:
             --config-file {input.config_file} \
             --output {output.output_file} \
             --output-format {params.output_format} 2>{log}
+        """
+
+rule extract_target_regions:
+    message:
+        "Extracts the regions marked as good"
+    input:
+        sequences = parameters.sequences_fasta,
+        post_processed_data = rules.post_process_nextclade.output.output_file
+    params:
+        output_format = parameters.output_format
+    output:
+        target_regions_bed = f"{parameters.output_dir}/sequences_target_regions.bed",
+        target_regions_sequences = f"{parameters.output_dir}/sequences_target_regions.fasta"
+    threads:
+        parameters.threads
+    log:
+        "logs/extract_target_regions.log"
+    shell:
+        """
+        python {PKG_PATH}/scripts/python/extract_target_regions.py \
+            --pp-results {input.post_processed_data} \
+            --output-format {params.output_format} \
+            --output {output.target_regions_bed} 2>{log}
+
+        # Remove range values (:start-end) that seqtk subseq includes in the header.
+        seqtk subseq {input.sequences} {output.target_regions_bed} | \
+            sed -e 's/\:[0-9]*-[0-9]*$//g' > {output.target_regions_sequences} 2>{log}
         """
