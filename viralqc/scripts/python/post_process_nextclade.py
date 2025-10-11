@@ -15,6 +15,8 @@ class StatusQuality(Enum):
 TARGET_COLUMNS = {
     "seqName": str,
     "virus": str,
+    "segment": str,
+    "ncbi_id": str,
     "clade": str,
     "targetRegions": str,
     "targetGene": str,
@@ -27,6 +29,14 @@ TARGET_COLUMNS = {
     "targetGeneCoverage": str,
     "qc.overallScore": "float64",
     "qc.overallStatus": str,
+    "alignmentScore": "float64",
+    "substitutions": str,
+    "deletions": str,
+    "insertions": str,
+    "frameShifts": str,
+    "aaSubstitutions": str,
+    "aaDeletions": str,
+    "aaInsertions": str,
     "totalSubstitutions": "Int64",
     "totalDeletions": "Int64",
     "totalInsertions": "Int64",
@@ -37,24 +47,19 @@ TARGET_COLUMNS = {
     "totalAminoacidDeletions": "Int64",
     "totalAminoacidInsertions": "Int64",
     "totalUnknownAa": "Int64",
-    "isReverseComplement": bool,
-    "qc.missingData.missingDataThreshold": "float64",
+    "qc.privateMutations.total": "Int64",
+    "privateNucMutations.totalLabeledSubstitutions": "Int64",
+    "privateNucMutations.totalUnlabeledSubstitutions": "Int64",
+    "privateNucMutations.totalReversionSubstitutions": "Int64",
+    "privateNucMutations.totalPrivateSubstitutions": "Int64",
     "qc.missingData.score": "float64",
     "qc.missingData.status": str,
-    "qc.missingData.totalMissing": "Int64",
     "qc.snpClusters.score": "float64",
     "qc.snpClusters.status": str,
-    "qc.snpClusters.totalSNPs": "Int64",
-    "qc.frameShifts.totalFrameShifts": "Int64",
-    "qc.frameShifts.totalFrameShiftsIgnored": "Int64",
     "qc.frameShifts.score": "float64",
     "qc.frameShifts.status": str,
-    "qc.stopCodons.totalStopCodons": "Int64",
     "qc.stopCodons.score": "float64",
     "qc.stopCodons.status": str,
-    "failedCdses": str,
-    "warnings": str,
-    "errors": str,
     "dataset": str,
     "datasetVersion": str,
 }
@@ -167,11 +172,13 @@ def format_dfs(files: list[str], config_file: Path) -> list[DataFrame]:
             virus_dataset = re.sub("\.nextclade.tsv", "", re.sub(".*\/", "", file))
             virus_info = config[virus_dataset]
             df = format_sc2_clade(df, virus_dataset)
-            df["virus"] = virus_info["virus_tag"]
+            df["virus"] = virus_info["virus_name"]
+            df["segment"] = virus_info["segment"]
+            df["ncbi_id"] = virus_info["ncbi_id"]
             df["dataset"] = virus_info["dataset"]
             df["datasetVersion"] = virus_info["tag"]
             df["targetGene"] = virus_info["target_gene"]
-            df["targetRegions"] = "-".join(virus_info["target_regions"])
+            df["targetRegions"] = "|".join(virus_info["target_regions"])
             df["genomeQuality"] = df["qc.overallStatus"].apply(
                 lambda x: StatusQuality[x].value if notna(x) else "missing"
             )
@@ -230,6 +237,12 @@ def _format_blast_virus_name(virus_name: str) -> str:
 
     return formatted_virus_name
 
+def _get_blast_virus_id(virus_name: str) -> str:
+    parts = virus_name.split("_")
+    virus_id = parts[0] + "_" + parts[1]
+
+    return virus_id
+
 
 def create_unmapped_df(unmapped_sequences: Path, blast_results: Path) -> DataFrame:
     """
@@ -285,7 +298,9 @@ def create_unmapped_df(unmapped_sequences: Path, blast_results: Path) -> DataFra
         final_df = merged.drop(["virus_df1", "virus_df2"], axis=1)
 
         final_df = final_df.copy()
+        final_df["ncbi_id"] = final_df["virus"].apply(_get_blast_virus_id)
         final_df["virus"] = final_df["virus"].apply(_format_blast_virus_name)
+
 
     return final_df
 

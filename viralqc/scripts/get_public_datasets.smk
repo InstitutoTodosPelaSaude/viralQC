@@ -39,4 +39,8 @@ rule get_nextclade_databases:
             --name "{params.dataset}" \
             --tag "{params.tag}" \
             --output-dir "{params.datasets_dir}/{wildcards.virus}"
+
+        for f in sequences.fasta tree.json; do
+            [ -f "{params.datasets_dir}/{wildcards.virus}/$f" ] || touch "{params.datasets_dir}/{wildcards.virus}/$f"
+        done
         """
