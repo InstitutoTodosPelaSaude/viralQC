@@ -5,7 +5,7 @@ from pandas.errors import EmptyDataError
 from yaml import safe_load
 
 
-target_threshold_cOLUMNS = {
+TARGET_COLUMNS = {
     "seqName": str,
     "virus": str,
     "segment": str,
@@ -260,7 +260,7 @@ def format_dfs(files: list[str], config_file: Path) -> list[DataFrame]:
         try:
             df = read_csv(file, sep="\t", header=0)
         except EmptyDataError:
-            df = DataFrame(columns=[target_threshold_cOLUMNS.keys()])
+            df = DataFrame(columns=[TARGET_COLUMNS.keys()])
 
         if not df.empty:
             virus_dataset = re.sub("\.nextclade.tsv", "", re.sub(".*\/", "", file))
@@ -408,15 +408,15 @@ def create_unmapped_df(unmapped_sequences: Path, blast_results: Path) -> DataFra
         data = [(line.strip(), "Unclassified") for line in f]
     df = DataFrame(data, columns=["seqName", "virus"])
 
-    for col in target_threshold_cOLUMNS.keys():
+    for col in TARGET_COLUMNS.keys():
         if col not in df.columns:
-            if target_threshold_cOLUMNS[col] == str:
+            if TARGET_COLUMNS[col] == str:
                 df[col] = ""
-            elif target_threshold_cOLUMNS[col] == "float64":
+            elif TARGET_COLUMNS[col] == "float64":
                 df[col] = None
-            elif target_threshold_cOLUMNS[col] == "Int64":
+            elif TARGET_COLUMNS[col] == "Int64":
                 df[col] = None
-            elif target_threshold_cOLUMNS[col] == bool:
+            elif TARGET_COLUMNS[col] == bool:
                 df[col] = None
             else:
                 df[col] = ""
@@ -471,8 +471,8 @@ def write_combined_df(
     """
     combined_df = concat(dfs, ignore_index=True)
     final_df = (
-        combined_df[target_threshold_cOLUMNS.keys()]
-        .astype(target_threshold_cOLUMNS)
+        combined_df[TARGET_COLUMNS.keys()]
+        .astype(TARGET_COLUMNS)
         .sort_values(by=["virus"])
     ).round(4)
 
