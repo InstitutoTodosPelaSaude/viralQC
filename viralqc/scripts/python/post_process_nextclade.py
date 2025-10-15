@@ -149,8 +149,23 @@ def get_genome_quality(
     genome_score_threshold_b: float,
     genome_score_threshold_c: float,
 ) -> str:
+    """
+    Evaluate the quality of genome and classify it as categories based
+    on coverage and score,
+
+    Args:
+        qc_overall_score: Value of the 'qc.OverallScore' column from the Nextclade output.
+        genome_coverage: Value of the 'coverage' column from the Nextclade output.
+        genome_coverage_threshold: Minimum required coverage for consider a genome as "A".
+        genome_score_threshold_a: Minimum required coverage for consider a target regions as "A".
+        genome_score_threshold_b: Minimum required coverage for consider a target regions as "B".
+        genome_score_threshold_c: Minimum required coverage for consider a target regions as "C".
+
+    Returns:
+        The quality of genome
+    """
     if qc_overall_score is None:
-        return qc_overall_score
+        return None
     elif (
         genome_coverage >= genome_coverage_threshold
         and qc_overall_score <= genome_score_threshold_a
@@ -174,7 +189,7 @@ def get_target_regions_quality(
 ) -> str:
     """
     Evaluate the quality of target regions and classify them as categories based
-    on target_threshold_a, target_threshold_b and target_threshold_c thresholds.
+    on coverage thresholds.
 
     Args:
         cds_coverage: Value of the 'cdsCoverage' column from the Nextclade output.
