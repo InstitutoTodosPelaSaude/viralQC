@@ -3,16 +3,9 @@ from pathlib import Path
 from pandas import read_csv, concat, DataFrame, notna
 from pandas.errors import EmptyDataError
 from yaml import safe_load
-from enum import Enum
 
 
-class StatusQuality(Enum):
-    bad = "bad"
-    mediocre = "median"
-    good = "good"
-
-
-TARGET_COLUMNS = {
+target_threshold_cOLUMNS = {
     "seqName": str,
     "virus": str,
     "segment": str,
@@ -23,6 +16,7 @@ TARGET_COLUMNS = {
     "genomeQuality": str,
     "targetRegionsQuality": str,
     "targetGeneQuality": str,
+    "cdsCoverageQuality": str,
     "coverage": "float64",
     "cdsCoverage": str,
     "targetRegionsCoverage": str,
@@ -64,6 +58,26 @@ TARGET_COLUMNS = {
     "datasetVersion": str,
 }
 
+# DEFAULT COVERAGE AND QUALITY SCORES
+GENOME_COV = 0.7
+GEONOME_SCORES = {
+    "A": 50,
+    "B": 75,
+    "C": 100,
+}
+
+GENE_COVERAGES = {
+    "A": 0.95,
+    "B": 0.75,
+    "C": 0.5,
+}
+
+REGION_COVERAGES = {
+    "A": 0.95,
+    "B": 0.75,
+    "C": 0.50,
+}
+
 
 def format_sc2_clade(df: DataFrame, dataset_name: str) -> DataFrame:
     """
@@ -93,26 +107,87 @@ def _parse_cds_cov(cds_list: str) -> list[dict[str, float]]:
     return result
 
 
+def get_cds_cov_quality(
+    cds_coverage: str,
+    target_threshold_a: float,
+    target_threshold_b: float,
+    target_threshold_c: float,
+) -> list[dict[str, str]]:
+    """
+    Categorize the cds regions based on coverage thresholds.
+
+    Args:
+        cds_coverage: Value of the 'cdsCoverage' column from the Nextclade output.
+        target_threshold_a: Minimum required coverage for consider a target regions as "A".
+        target_threshold_b: Minimum required coverage for consider a target regions as "B".
+        target_threshold_c: Minimum required coverage for consider a target regions as "C".
+
+    Returns:
+        The status of the target regions.
+    """
+    parts = cds_coverage.split(",")
+    result = {}
+    for p in parts:
+        cds, cov = p.split(":")
+        if float(cov) >= target_threshold_a:
+            result[cds] = "A"
+        elif float(cov) >= target_threshold_b:
+            result[cds] = "B"
+        elif float(cov) >= target_threshold_c:
+            result[cds] = "C"
+        elif float(cov) > 0:
+            result[cds] = "D"
+
+    return ", ".join(f"{cds}: {coverage}" for cds, coverage in result.items())
+
+
+def get_genome_quality(
+    qc_overall_score: float,
+    genome_coverage: float,
+    genome_coverage_threshold: float,
+    genome_score_threshold_a: float,
+    genome_score_threshold_b: float,
+    genome_score_threshold_c: float,
+) -> str:
+    if qc_overall_score is None:
+        return qc_overall_score
+    elif (
+        genome_coverage >= genome_coverage_threshold
+        and qc_overall_score <= genome_score_threshold_a
+    ):
+        return "A"
+    elif qc_overall_score <= genome_score_threshold_b:
+        return "B"
+    elif qc_overall_score <= genome_score_threshold_c:
+        return "C"
+    else:
+        return "D"
+
+
 def get_target_regions_quality(
     cds_coverage: str,
     genome_quality: str,
     target_regions: list,
-    target_regions_cov: float,
+    target_threshold_a: float,
+    target_threshold_b: float,
+    target_threshold_c: float,
 ) -> str:
     """
-    Evaluate the quality of target regions. If any region has coverage
-    lower than `target_regions_cov`, its status will be considered 'bad'.
+    Evaluate the quality of target regions and classify them as categories based
+    on target_threshold_a, target_threshold_b and target_threshold_c thresholds.
 
     Args:
         cds_coverage: Value of the 'cdsCoverage' column from the Nextclade output.
         genome_quality: Quality of genome.
         target_regions: List of target regions.
-        target_regions_cov: Minimum required coverage for target regions.
+        target_threshold_a: Minimum required coverage for consider a target regions as "A".
+        target_threshold_b: Minimum required coverage for consider a target regions as "B".
+        target_threshold_c: Minimum required coverage for consider a target regions as "C".
 
     Returns:
         The status of the target regions.
     """
-    if genome_quality in ["good", ""]:
+    if genome_quality in ["A", ""]:
         return ""
 
     cds_coverage = _parse_cds_cov(cds_coverage)
@@ -121,10 +196,14 @@ def get_target_regions_quality(
         coverages.append(float(cds_coverage.get(region, 0)))
     mean_coverage = sum(coverages) / len(coverages)
 
-    if mean_coverage >= target_regions_cov:
-        return "good"
+    if mean_coverage >= target_threshold_a:
+        return "A"
+    elif mean_coverage >= target_threshold_b:
+        return "B"
+    elif mean_coverage >= target_threshold_c:
+        return "C"
 
-    return "bad"
+    return "D"
 
 
 def get_target_regions_coverage(cds_coverage: str, target_regions: list[str]) -> str:
@@ -139,11 +218,11 @@ def get_target_regions_coverage(cds_coverage: str, target_regions: list[str]) ->
         A string with region and coverage.
     """
     cds_coverage = _parse_cds_cov(cds_coverage)
-    target_cds_coverage = [
+    target_threshold_cds_coverage = [
         f"{region}: {cds_coverage.get(region,0)}" for region in target_regions
     ]
 
-    return ", ".join(target_cds_coverage)
+    return ", ".join(target_threshold_cds_coverage)
 
 
 def format_dfs(files: list[str], config_file: Path) -> list[DataFrame]:
@@ -166,7 +245,7 @@ def format_dfs(files: list[str], config_file: Path) -> list[DataFrame]:
         try:
             df = read_csv(file, sep="\t", header=0)
         except EmptyDataError:
-            df = DataFrame(columns=[TARGET_COLUMNS.keys()])
+            df = DataFrame(columns=[target_threshold_cOLUMNS.keys()])
 
         if not df.empty:
             virus_dataset = re.sub("\.nextclade.tsv", "", re.sub(".*\/", "", file))
@@ -179,16 +258,45 @@ def format_dfs(files: list[str], config_file: Path) -> list[DataFrame]:
             df["datasetVersion"] = virus_info["tag"]
             df["targetGene"] = virus_info["target_gene"]
             df["targetRegions"] = "|".join(virus_info["target_regions"])
-            df["genomeQuality"] = df["qc.overallStatus"].apply(
-                lambda x: StatusQuality[x].value if notna(x) else "missing"
+            # df["genomeQuality"] = df["qc.overallStatus"].apply(
+            #     lambda x: StatusQuality[x].value if notna(x) else "missing"
+            # )
+            df["genomeQuality"] = df.apply(
+                lambda row: (
+                    get_genome_quality(
+                        qc_overall_score=row["qc.overallScore"],
+                        genome_coverage=row["coverage"],
+                        genome_coverage_threshold=virus_info.get(
+                            "genome_cov", GENOME_COV
+                        ),
+                        genome_score_threshold_a=virus_info.get(
+                            "genome_score_threshold", GEONOME_SCORES
+                        ).get("A"),
+                        genome_score_threshold_b=virus_info.get(
+                            "genome_score_threshold", GEONOME_SCORES
+                        ).get("B"),
+                        genome_score_threshold_c=virus_info.get(
+                            "genome_score_threshold", GEONOME_SCORES
+                        ).get("C"),
+                    )
+                ),
+                axis=1,
             )
             df["targetRegionsQuality"] = df.apply(
                 lambda row: (
                     get_target_regions_quality(
-                        row["cdsCoverage"],
-                        row["genomeQuality"],
-                        virus_info["target_regions"],
-                        virus_info["target_regions_cov"],
+                        cds_coverage=row["cdsCoverage"],
+                        genome_quality=row["genomeQuality"],
+                        target_regions=virus_info["target_regions"],
+                        target_threshold_a=virus_info.get(
+                            "target_regions_cov", REGION_COVERAGES
+                        ).get("A"),
+                        target_threshold_b=virus_info.get(
+                            "target_regions_cov", REGION_COVERAGES
+                        ).get("B"),
+                        target_threshold_c=virus_info.get(
+                            "target_regions_cov", REGION_COVERAGES
+                        ).get("C"),
                     )
                     if notna(row["cdsCoverage"])
                     else ""
@@ -205,10 +313,18 @@ def format_dfs(files: list[str], config_file: Path) -> list[DataFrame]:
             df["targetGeneQuality"] = df.apply(
                 lambda row: (
                     get_target_regions_quality(
-                        row["cdsCoverage"],
-                        row["targetRegionsQuality"],
-                        [virus_info["target_gene"]],
-                        virus_info["target_gene_cov"],
+                        cds_coverage=row["cdsCoverage"],
+                        genome_quality=row["targetRegionsQuality"],
+                        target_regions=[virus_info["target_gene"]],
+                        target_threshold_a=virus_info.get(
+                            "target_regions_cov", GENE_COVERAGES
+                        ).get("A"),
+                        target_threshold_b=virus_info.get(
+                            "target_regions_cov", GENE_COVERAGES
+                        ).get("B"),
+                        target_threshold_c=virus_info.get(
+                            "target_regions_cov", GENE_COVERAGES
+                        ).get("C"),
                     )
                     if notna(row["cdsCoverage"])
                     else ""
@@ -226,6 +342,25 @@ def format_dfs(files: list[str], config_file: Path) -> list[DataFrame]:
             df["cdsCoverage"] = df["cdsCoverage"].apply(
                 lambda d: ", ".join(f"{cds}: {coverage}" for cds, coverage in d.items())
             )
+            df["cdsCoverageQuality"] = df.apply(
+                lambda row: (
+                    get_cds_cov_quality(
+                        cds_coverage=row["cdsCoverage"],
+                        target_threshold_a=virus_info.get(
+                            "target_regions_cov", REGION_COVERAGES
+                        ).get("A"),
+                        target_threshold_b=virus_info.get(
+                            "target_regions_cov", REGION_COVERAGES
+                        ).get("B"),
+                        target_threshold_c=virus_info.get(
+                            "target_regions_cov", REGION_COVERAGES
+                        ).get("C"),
+                    )
+                    if notna(row["cdsCoverage"])
+                    else ""
+                ),
+                axis=1,
+            )
         dfs.append(df)
 
     return dfs
@@ -236,6 +371,7 @@ def _format_blast_virus_name(virus_name: str) -> str:
     formatted_virus_name = re.sub("-", " ", formatted_virus_name)
 
     return formatted_virus_name
+
 
 def _get_blast_virus_id(virus_name: str) -> str:
     parts = virus_name.split("_")
@@ -257,15 +393,15 @@ def create_unmapped_df(unmapped_sequences: Path, blast_results: Path) -> DataFra
         data = [(line.strip(), "Unclassified") for line in f]
     df = DataFrame(data, columns=["seqName", "virus"])
 
-    for col in TARGET_COLUMNS.keys():
+    for col in target_threshold_cOLUMNS.keys():
         if col not in df.columns:
-            if TARGET_COLUMNS[col] == str:
+            if target_threshold_cOLUMNS[col] == str:
                 df[col] = ""
-            elif TARGET_COLUMNS[col] == "float64":
+            elif target_threshold_cOLUMNS[col] == "float64":
                 df[col] = None
-            elif TARGET_COLUMNS[col] == "Int64":
+            elif target_threshold_cOLUMNS[col] == "Int64":
                 df[col] = None
-            elif TARGET_COLUMNS[col] == bool:
+            elif target_threshold_cOLUMNS[col] == bool:
                 df[col] = None
             else:
                 df[col] = ""
@@ -301,7 +437,6 @@ def create_unmapped_df(unmapped_sequences: Path, blast_results: Path) -> DataFra
         final_df["ncbi_id"] = final_df["virus"].apply(_get_blast_virus_id)
         final_df["virus"] = final_df["virus"].apply(_format_blast_virus_name)
 
-
     return final_df
 
 
@@ -321,8 +456,8 @@ def write_combined_df(
     """
     combined_df = concat(dfs, ignore_index=True)
     final_df = (
-        combined_df[TARGET_COLUMNS.keys()]
-        .astype(TARGET_COLUMNS)
+        combined_df[target_threshold_cOLUMNS.keys()]
+        .astype(target_threshold_cOLUMNS)
         .sort_values(by=["virus"])
     ).round(4)
 
