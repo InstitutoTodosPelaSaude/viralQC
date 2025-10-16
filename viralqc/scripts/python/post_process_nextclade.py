@@ -265,11 +265,11 @@ def get_target_regions_coverage(cds_coverage: str, target_regions: list[str]) ->
         A string with region and coverage.
     """
     cds_coverage = _parse_cds_cov(cds_coverage)
-    target_threshold_cds_coverage = [
+    target_cds_coverage = [
         f"{region}: {cds_coverage.get(region,0)}" for region in target_regions
     ]
 
-    return ", ".join(target_threshold_cds_coverage)
+    return ", ".join(target_cds_coverage)
 
 
 def add_coverages(df: DataFrame, virus_info: dict) -> DataFrame:
