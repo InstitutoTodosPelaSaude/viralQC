@@ -1,6 +1,6 @@
 import argparse, re, csv, os
 from pathlib import Path
-from pandas import read_csv, concat, DataFrame, notna
+from pandas import read_csv, concat, DataFrame, notna, Series
 from numpy import nan
 from pandas.errors import EmptyDataError
 from yaml import safe_load
@@ -338,133 +338,88 @@ def add_qualities(df: DataFrame, virus_info: dict) -> DataFrame:
         ),
         axis=1,
     )
-    df["privateMutationsQuality"] = df.apply(
-        lambda row: (
-            get_qc_metric_quality(
-                score=row["qc.privateMutations.score"],
-                score_threshold_a=virus_info.get(
-                    "private_mutation_score_threshold", DEFAULT_SCORES
-                ).get("A"),
-                score_threshold_b=virus_info.get(
-                    "private_mutation_score_threshold", DEFAULT_SCORES
-                ).get("B"),
-                score_threshold_c=virus_info.get(
-                    "private_mutation_score_threshold", DEFAULT_SCORES
-                ).get("C"),
+
+    # Metrics qualities
+    def _compute_qc_metrics(row):
+        results = {}
+        for metric, metric_fields in metrics.items():
+            col = metric_fields["nextclade_column"]
+            thresholds = virus_info.get(col, DEFAULT_SCORES)
+            results[metric] = get_qc_metric_quality(
+                score=row[col],
+                score_threshold_a=thresholds.get("A"),
+                score_threshold_b=thresholds.get("B"),
+                score_threshold_c=thresholds.get("C"),
             )
-        ),
-        axis=1,
-    )
-    df["missingDataQuality"] = df.apply(
-        lambda row: (
-            get_qc_metric_quality(
-                score=row["qc.missingData.score"],
-                score_threshold_a=virus_info.get(
-                    "missing_data_score_threshold", DEFAULT_SCORES
-                ).get("A"),
-                score_threshold_b=virus_info.get(
-                    "missing_data_score_threshold", DEFAULT_SCORES
-                ).get("B"),
-                score_threshold_c=virus_info.get(
-                    "missing_data_score_threshold", DEFAULT_SCORES
-                ).get("C"),
+        return Series(results)
+
+    metrics = {
+        "privateMutationsQuality": {
+            "nextclade_column": "qc.privateMutations.score",
+            "viral_qc_field": "private_mutation_score_threshold",
+        },
+        "missingDataQuality": {
+            "nextclade_column": "qc.missingData.score",
+            "viral_qc_field": "missing_data_score_threshold",
+        },
+        "snpClustersQuality": {
+            "nextclade_column": "qc.snpClusters.score",
+            "viral_qc_field": "snp_clusters_score_threshold",
+        },
+        "frameShiftsQuality": {
+            "nextclade_column": "qc.frameShifts.score",
+            "viral_qc_field": "frame_shifts_score_threshold",
+        },
+        "stopCodonsQuality": {
+            "nextclade_column": "qc.stopCodons.score",
+            "viral_qc_field": "stop_codons_score_threshold",
+        },
+    }
+    df[list(metrics.keys())] = df.apply(_compute_qc_metrics, axis=1)
+
+    # Target region and gene qualities
+    def _compute_target_qualities(row):
+        if notna(row["cdsCoverage"]):
+            thresholds = virus_info.get(
+                "target_regions_cov", DEFAULT_COVERAGES_THRESHOLD
             )
-        ),
-        axis=1,
-    )
-    df["snpClustersQuality"] = df.apply(
-        lambda row: (
-            get_qc_metric_quality(
-                score=row["qc.snpClusters.score"],
-                score_threshold_a=virus_info.get(
-                    "snp_clusters_score_threshold", DEFAULT_SCORES
-                ).get("A"),
-                score_threshold_b=virus_info.get(
-                    "snp_clusters_score_threshold", DEFAULT_SCORES
-                ).get("B"),
-                score_threshold_c=virus_info.get(
-                    "snp_clusters_score_threshold", DEFAULT_SCORES
-                ).get("C"),
-            )
-        ),
-        axis=1,
-    )
-    df["frameShiftsQuality"] = df.apply(
-        lambda row: (
-            get_qc_metric_quality(
-                score=row["qc.frameShifts.score"],
-                score_threshold_a=virus_info.get(
-                    "frame_shifts_score_threshold", DEFAULT_SCORES
-                ).get("A"),
-                score_threshold_b=virus_info.get(
-                    "frame_shifts_score_threshold", DEFAULT_SCORES
-                ).get("B"),
-                score_threshold_c=virus_info.get(
-                    "frame_shifts_score_threshold", DEFAULT_SCORES
-                ).get("C"),
-            )
-        ),
-        axis=1,
-    )
-    df["stopCodonsQuality"] = df.apply(
-        lambda row: (
-            get_qc_metric_quality(
-                score=row["qc.stopCodons.score"],
-                score_threshold_a=virus_info.get(
-                    "stop_codons_score_threshold", DEFAULT_SCORES
-                ).get("A"),
-                score_threshold_b=virus_info.get(
-                    "stop_codons_score_threshold", DEFAULT_SCORES
-                ).get("B"),
-                score_threshold_c=virus_info.get(
-                    "stop_codons_score_threshold", DEFAULT_SCORES
-                ).get("C"),
-            )
-        ),
-        axis=1,
-    )
-    df["targetRegionsQuality"] = df.apply(
-        lambda row: (
-            get_target_regions_quality(
+
+            target_regions_quality = get_target_regions_quality(
                 cds_coverage=row["cdsCoverage"],
                 genome_quality=row["genomeQuality"],
                 target_regions=virus_info["target_regions"],
-                target_threshold_a=virus_info.get(
-                    "target_regions_cov", DEFAULT_COVERAGES_THRESHOLD
-                ).get("A"),
-                target_threshold_b=virus_info.get(
-                    "target_regions_cov", DEFAULT_COVERAGES_THRESHOLD
-                ).get("B"),
-                target_threshold_c=virus_info.get(
-                    "target_regions_cov", DEFAULT_COVERAGES_THRESHOLD
-                ).get("C"),
+                target_threshold_a=thresholds.get("A"),
+                target_threshold_b=thresholds.get("B"),
+                target_threshold_c=thresholds.get("C"),
             )
-            if notna(row["cdsCoverage"])
-            else ""
-        ),
-        axis=1,
-    )
-    df["targetGeneQuality"] = df.apply(
-        lambda row: (
-            get_target_regions_quality(
+
+            target_gene_quality = get_target_regions_quality(
                 cds_coverage=row["cdsCoverage"],
-                genome_quality=row["targetRegionsQuality"],
+                genome_quality=target_regions_quality,
                 target_regions=[virus_info["target_gene"]],
-                target_threshold_a=virus_info.get(
-                    "target_regions_cov", DEFAULT_COVERAGES_THRESHOLD
-                ).get("A"),
-                target_threshold_b=virus_info.get(
-                    "target_regions_cov", DEFAULT_COVERAGES_THRESHOLD
-                ).get("B"),
-                target_threshold_c=virus_info.get(
-                    "target_regions_cov", DEFAULT_COVERAGES_THRESHOLD
-                ).get("C"),
+                target_threshold_a=thresholds.get("A"),
+                target_threshold_b=thresholds.get("B"),
+                target_threshold_c=thresholds.get("C"),
             )
-            if notna(row["cdsCoverage"])
-            else ""
-        ),
-        axis=1,
+
+            return Series(
+                {
+                    "targetRegionsQuality": target_regions_quality,
+                    "targetGeneQuality": target_gene_quality,
+                }
+            )
+        else:
+            return Series(
+                {
+                    "targetRegionsQuality": "",
+                    "targetGeneQuality": "",
+                }
+            )
+
+    df[["targetRegionsQuality", "targetGeneQuality"]] = df.apply(
+        _compute_target_qualities, axis=1
     )
+
     df["cdsCoverageQuality"] = df.apply(
         lambda row: (
             get_cds_cov_quality(
@@ -621,7 +576,7 @@ def write_combined_df(
         .astype(TARGET_COLUMNS)
         .sort_values(by=["virus"])
     ).round(4)
-    final_df = final_df.replace(r'^\s*$', nan, regex=True)
+    final_df = final_df.replace(r"^\s*$", nan, regex=True)
 
     if output_format == "tsv":
         final_df.to_csv(output_file, sep="\t", index=False, header=True)
