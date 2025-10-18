@@ -6,6 +6,14 @@ denv1:
   ncbi_id: "NC_001477.1"
   target_gene: "E"
   target_regions: ["C","prM","E"]
+  genome_score_threshold:
+    A: 45
+    B: 75
+    C: 100
+  private_mutation_score_threshold:
+    A: 45
+    B: 100
+    C: 250
 denv2:
   dataset: "community/v-gen-lab/dengue/denv2"
   tag: "2025-03-26--11-47-13Z"
