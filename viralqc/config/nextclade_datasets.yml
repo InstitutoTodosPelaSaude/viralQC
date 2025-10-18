@@ -54,6 +54,10 @@ rsva:
   ncbi_id: "PP109421.1"
   target_gene: "F"
   target_regions: ["G", "F"]
+  genome_score_threshold:
+    A: 30
+    B: 75
+    C: 200
   private_mutation_score_threshold:
     A: 20
     B: 100
@@ -66,6 +70,10 @@ rsvb:
   ncbi_id: "OP975389.1"
   target_gene: "F"
   target_regions: ["G", "F"]
+  genome_score_threshold:
+    A: 70
+    B: 150
+    C: 500
   private_mutation_score_threshold:
     A: 5
     B: 30
@@ -110,6 +118,10 @@ flu-h1n1-na:
   ncbi_id: "MW626056.1"
   target_gene: "NA"
   target_regions: ["NA"]
+  genome_score_threshold:
+    A: 30
+    B: 150
+    C: 400
   private_mutation_score_threshold:
     A: 35
     B: 500
