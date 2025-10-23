@@ -15,11 +15,13 @@ TARGET_COLUMNS = {
     "targetRegions": str,
     "targetGene": str,
     "genomeQuality": str,
+    "genomeQualityScore": str,
     "targetRegionsQuality": str,
     "targetGeneQuality": str,
     "cdsCoverageQuality": str,
-    "privateMutationsQuality": str,
     "missingDataQuality": str,
+    "privateMutationsQuality": str,
+    "mixedSitesQuality": str,
     "snpClustersQuality": str,
     "frameShiftsQuality": str,
     "stopCodonsQuality": str,
@@ -56,25 +58,25 @@ TARGET_COLUMNS = {
     "qc.privateMutations.status": str,
     "qc.missingData.score": "float64",
     "qc.missingData.status": str,
+    "qc.mixedSites.totalMixedSites": "Int64",
+    "qc.mixedSites.score": "float64",
+    "qc.mixedSites.status": str,
+    "qc.snpClusters.totalSNPs": "Int64",
     "qc.snpClusters.score": "float64",
     "qc.snpClusters.status": str,
+    "qc.frameShifts.totalFrameShifts": "Int64",
     "qc.frameShifts.score": "float64",
     "qc.frameShifts.status": str,
+    "qc.stopCodons.totalStopCodons": "Int64",
     "qc.stopCodons.score": "float64",
     "qc.stopCodons.status": str,
     "dataset": str,
     "datasetVersion": str,
 }
 
-# DEFAULT COVERAGE AND QUALITY SCORES
-GENOME_COVERAGE_THRESHOLD = 0.7
-DEFAULT_SCORES = {
-    "A": 50,
-    "B": 75,
-    "C": 100,
-}
 
-DEFAULT_COVERAGES_THRESHOLD = {
+DEFAULT_PRIVATE_MUTATION_TOTAL_THRESHOLD = 10
+COVERAGES_THRESHOLD = {
     "A": 0.95,
     "B": 0.75,
     "C": 0.5,
@@ -98,6 +100,72 @@ def format_sc2_clade(df: DataFrame, dataset_name: str) -> DataFrame:
         df["clade"] = df["Nextclade_pango"]
 
     return df
+
+
+def get_missing_data_quality(coverage: float) -> str:
+    if not notna(coverage):
+        return ""
+    elif coverage >= COVERAGES_THRESHOLD.get("A"):
+        return "A"
+    elif coverage >= COVERAGES_THRESHOLD.get("B"):
+        return "B"
+    elif coverage >= COVERAGES_THRESHOLD.get("C"):
+        return "C"
+    else:
+        return "D"
+
+
+def get_private_mutations_quality(total: int, threshold: int) -> str:
+    if not notna(total):
+        return ""
+    elif total <= threshold:
+        return "A"
+    elif total <= threshold * 1.05:
+        return "B"
+    elif total <= threshold * 1.1:
+        return "C"
+    else:
+        return "D"
+
+
+def get_qc_quality(total: int) -> str:
+    if not notna(total):
+        return None
+    elif total == 0:
+        return "A"
+    elif total == 1:
+        return "B"
+    elif total == 2:
+        return "C"
+    else:
+        return "D"
+
+
+def get_genome_quality(scores: list[str]) -> tuple[int, str]:
+    """
+    Evaluate the quality of genome based on 6 quality scores.
+
+    Args:
+        scores: List of scores categories.
+
+    Returns:
+        The quality of genome
+    """
+    values = {"A": 4, "B": 3, "C": 2, "D": 1}
+    valid_scores = [values[s] for s in scores if s in values]
+
+    total = sum(valid_scores)
+    max_possible = len(valid_scores) * 4
+    normalized_total = (total / max_possible) * 24
+
+    if normalized_total == 24:
+        return normalized_total, "A"
+    elif normalized_total >= 18:
+        return normalized_total, "B"
+    elif normalized_total >= 12:
+        return normalized_total, "C"
+
+    return normalized_total, "D"
 
 
 def _parse_cds_cov(cds_list: str) -> list[dict[str, float]]:
@@ -143,74 +211,6 @@ def get_cds_cov_quality(
     return ", ".join(f"{cds}: {coverage}" for cds, coverage in result.items())
 
 
-def get_genome_quality(
-    qc_overall_score: float,
-    genome_coverage: float,
-    genome_coverage_threshold: float,
-    genome_score_threshold_a: float,
-    genome_score_threshold_b: float,
-    genome_score_threshold_c: float,
-) -> str:
-    """
-    Evaluate the quality of genome and classify it as categories based
-    on coverage and score,
-
-    Args:
-        qc_overall_score: Value of the 'qc.OverallScore' column from the Nextclade output.
-        genome_coverage: Value of the 'coverage' column from the Nextclade output.
-        genome_coverage_threshold: Minimum required coverage for consider a genome as "A".
-        genome_score_threshold_a: Minimum required coverage for consider a target regions as "A".
-        genome_score_threshold_b: Minimum required coverage for consider a target regions as "B".
-        genome_score_threshold_c: Minimum required coverage for consider a target regions as "C".
-
-    Returns:
-        The quality of genome
-    """
-    if not notna(qc_overall_score):
-        return ""
-    elif (
-        genome_coverage >= genome_coverage_threshold
-        and qc_overall_score <= genome_score_threshold_a
-    ):
-        return "A"
-    elif qc_overall_score <= genome_score_threshold_b:
-        return "B"
-    elif qc_overall_score <= genome_score_threshold_c:
-        return "C"
-    else:
-        return "D"
-
-
-def get_qc_metric_quality(
-    score: float,
-    score_threshold_a: float,
-    score_threshold_b: float,
-    score_threshold_c: float,
-) -> str:
-    """
-    Set the quality of metric score.
-
-    Args:
-        score: Value of a qc metric score column from the Nextclade output.
-        score_threshold_a: Minimum required coverage for consider a target regions as "A".
-        score_threshold_b: Minimum required coverage for consider a target regions as "B".
-        score_threshold_c: Minimum required coverage for consider a target regions as "C".
-
-    Returns:
-        The quality of metric.
-    """
-    if not notna(score):
-        return ""
-    elif score <= score_threshold_a:
-        return "A"
-    elif score <= score_threshold_b:
-        return "B"
-    elif score <= score_threshold_c:
-        return "C"
-    else:
-        return "D"
-
-
 def get_target_regions_quality(
     cds_coverage: str,
     genome_quality: str,
@@ -234,15 +234,15 @@ def get_target_regions_quality(
     Returns:
         The status of the target regions.
     """
-    if genome_quality in ["A", ""]:
+    if genome_quality in ["A", "B", ""]:
         return ""
 
     cds_coverage = _parse_cds_cov(cds_coverage)
+    cds_coverage = {k.strip(): v for k, v in cds_coverage.items()}
     coverages = []
     for region in target_regions:
         coverages.append(float(cds_coverage.get(region, 0)))
     mean_coverage = sum(coverages) / len(coverages)
-
     if mean_coverage >= target_threshold_a:
         return "A"
     elif mean_coverage >= target_threshold_b:
@@ -307,139 +307,98 @@ def add_coverages(df: DataFrame, virus_info: dict) -> DataFrame:
 
 def add_qualities(df: DataFrame, virus_info: dict) -> DataFrame:
     """
-    Add 'genomeQuality', 'targetRegionsQuality', 'targetGeneQuality' and
-    'cdsCoverageQuality'  to results datafarame.
+    Compute all quality metrics into a single apply.
 
     Args:
         df: Dataframe of nextclade results.
         virus_info: Dictionary with specific virus configuration
 
     Returns:
-        The dataframe with the new columns.
+        The dataframe with the new quality columns.
     """
-    df["genomeQuality"] = df.apply(
-        lambda row: (
-            get_genome_quality(
-                qc_overall_score=row["qc.overallScore"],
-                genome_coverage=row["coverage"],
-                genome_coverage_threshold=virus_info.get(
-                    "GENOME_COVERAGE_THRESHOLD", GENOME_COVERAGE_THRESHOLD
-                ),
-                genome_score_threshold_a=virus_info.get(
-                    "genome_score_threshold", DEFAULT_SCORES
-                ).get("A"),
-                genome_score_threshold_b=virus_info.get(
-                    "genome_score_threshold", DEFAULT_SCORES
-                ).get("B"),
-                genome_score_threshold_c=virus_info.get(
-                    "genome_score_threshold", DEFAULT_SCORES
-                ).get("C"),
-            )
-        ),
-        axis=1,
-    )
 
-    # Metrics qualities
-    def _compute_qc_metrics(row):
-        results = {}
-        for metric, metric_fields in metrics.items():
-            col = metric_fields["nextclade_column"]
-            thresholds = virus_info.get(col, DEFAULT_SCORES)
-            results[metric] = get_qc_metric_quality(
-                score=row[col],
-                score_threshold_a=thresholds.get("A"),
-                score_threshold_b=thresholds.get("B"),
-                score_threshold_c=thresholds.get("C"),
-            )
-        return Series(results)
+    def compute_all_qualities(row):
+        # --- Metrics qualities ---
+        missing_data_quality = get_missing_data_quality(row["coverage"])
+        private_mutations_quality = get_private_mutations_quality(
+            total=row["qc.privateMutations.total"],
+            threshold=virus_info.get(
+                "private_mutation_total_threshold",
+                DEFAULT_PRIVATE_MUTATION_TOTAL_THRESHOLD,
+            ),
+        )
+        mixed_sites_quality = get_qc_quality(row["qc.mixedSites.totalMixedSites"])
+        snp_clusters_quality = get_qc_quality(row["qc.snpClusters.totalSNPs"])
+        frameshifts_quality = get_qc_quality(row["qc.frameShifts.totalFrameShifts"])
+        stop_codons_quality = get_qc_quality(row["qc.stopCodons.totalStopCodons"])
 
-    metrics = {
-        "privateMutationsQuality": {
-            "nextclade_column": "qc.privateMutations.score",
-            "viral_qc_field": "private_mutation_score_threshold",
-        },
-        "missingDataQuality": {
-            "nextclade_column": "qc.missingData.score",
-            "viral_qc_field": "missing_data_score_threshold",
-        },
-        "snpClustersQuality": {
-            "nextclade_column": "qc.snpClusters.score",
-            "viral_qc_field": "snp_clusters_score_threshold",
-        },
-        "frameShiftsQuality": {
-            "nextclade_column": "qc.frameShifts.score",
-            "viral_qc_field": "frame_shifts_score_threshold",
-        },
-        "stopCodonsQuality": {
-            "nextclade_column": "qc.stopCodons.score",
-            "viral_qc_field": "stop_codons_score_threshold",
-        },
-    }
-    df[list(metrics.keys())] = df.apply(_compute_qc_metrics, axis=1)
+        # --- Genome quality ---
+        genome_score, genome_quality = get_genome_quality(
+            [
+                missing_data_quality,
+                mixed_sites_quality,
+                private_mutations_quality,
+                snp_clusters_quality,
+                frameshifts_quality,
+                stop_codons_quality,
+            ]
+        )
 
-    # Target region and gene qualities
-    def _compute_target_qualities(row):
+        # --- Target qualities ---
         if notna(row["cdsCoverage"]):
-            thresholds = virus_info.get(
-                "target_regions_cov", DEFAULT_COVERAGES_THRESHOLD
-            )
-
             target_regions_quality = get_target_regions_quality(
                 cds_coverage=row["cdsCoverage"],
-                genome_quality=row["genomeQuality"],
+                genome_quality=genome_quality,
                 target_regions=virus_info["target_regions"],
-                target_threshold_a=thresholds.get("A"),
-                target_threshold_b=thresholds.get("B"),
-                target_threshold_c=thresholds.get("C"),
+                target_threshold_a=COVERAGES_THRESHOLD["A"],
+                target_threshold_b=COVERAGES_THRESHOLD["B"],
+                target_threshold_c=COVERAGES_THRESHOLD["C"],
             )
 
             target_gene_quality = get_target_regions_quality(
                 cds_coverage=row["cdsCoverage"],
                 genome_quality=target_regions_quality,
                 target_regions=[virus_info["target_gene"]],
-                target_threshold_a=thresholds.get("A"),
-                target_threshold_b=thresholds.get("B"),
-                target_threshold_c=thresholds.get("C"),
+                target_threshold_a=COVERAGES_THRESHOLD["A"],
+                target_threshold_b=COVERAGES_THRESHOLD["B"],
+                target_threshold_c=COVERAGES_THRESHOLD["C"],
             )
 
-            return Series(
-                {
-                    "targetRegionsQuality": target_regions_quality,
-                    "targetGeneQuality": target_gene_quality,
-                }
-            )
-        else:
-            return Series(
-                {
-                    "targetRegionsQuality": "",
-                    "targetGeneQuality": "",
-                }
-            )
-
-    df[["targetRegionsQuality", "targetGeneQuality"]] = df.apply(
-        _compute_target_qualities, axis=1
-    )
-
-    df["cdsCoverageQuality"] = df.apply(
-        lambda row: (
-            get_cds_cov_quality(
+            cds_cov_quality = get_cds_cov_quality(
                 cds_coverage=row["cdsCoverage"],
                 target_threshold_a=virus_info.get(
-                    "target_regions_cov", DEFAULT_COVERAGES_THRESHOLD
-                ).get("A"),
+                    "target_regions_cov", COVERAGES_THRESHOLD
+                )["A"],
                 target_threshold_b=virus_info.get(
-                    "target_regions_cov", DEFAULT_COVERAGES_THRESHOLD
-                ).get("B"),
+                    "target_regions_cov", COVERAGES_THRESHOLD
+                )["B"],
                 target_threshold_c=virus_info.get(
-                    "target_regions_cov", DEFAULT_COVERAGES_THRESHOLD
-                ).get("C"),
+                    "target_regions_cov", COVERAGES_THRESHOLD
+                )["C"],
             )
-            if notna(row["cdsCoverage"])
-            else ""
-        ),
-        axis=1,
-    )
-    return df
+        else:
+            target_regions_quality = ""
+            target_gene_quality = ""
+            cds_cov_quality = ""
+
+        return Series(
+            {
+                "missingDataQuality": missing_data_quality,
+                "privateMutationsQuality": private_mutations_quality,
+                "mixedSitesQuality": mixed_sites_quality,
+                "snpClustersQuality": snp_clusters_quality,
+                "frameShiftsQuality": frameshifts_quality,
+                "stopCodonsQuality": stop_codons_quality,
+                "genomeQualityScore": genome_score,
+                "genomeQuality": genome_quality,
+                "targetRegionsQuality": target_regions_quality,
+                "targetGeneQuality": target_gene_quality,
+                "cdsCoverageQuality": cds_cov_quality,
+            }
+        )
+
+    qualities_df = df.apply(compute_all_qualities, axis=1)
+    return concat([df, qualities_df], axis=1)
 
 
 def format_dfs(files: list[str], config_file: Path) -> list[DataFrame]:

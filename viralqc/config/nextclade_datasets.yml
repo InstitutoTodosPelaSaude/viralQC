@@ -6,14 +6,7 @@ denv1:
   ncbi_id: "NC_001477.1"
   target_gene: "E"
   target_regions: ["C","prM","E"]
-  genome_score_threshold:
-    A: 45
-    B: 75
-    C: 100
-  private_mutation_score_threshold:
-    A: 45
-    B: 100
-    C: 250
+  private_mutation_total_threshold: 45
 denv2:
   dataset: "community/v-gen-lab/dengue/denv2"
   tag: "2025-03-26--11-47-13Z"
@@ -62,14 +55,7 @@ rsva:
   ncbi_id: "PP109421.1"
   target_gene: "F"
   target_regions: ["G", "F"]
-  genome_score_threshold:
-    A: 30
-    B: 75
-    C: 200
-  private_mutation_score_threshold:
-    A: 20
-    B: 100
-    C: 190
+  private_mutation_total_threshold: 20
 rsvb:
   dataset: "nextstrain/rsv/b/EPI_ISL_1653999"
   tag: "2025-03-04--17-31-25Z"
@@ -78,14 +64,7 @@ rsvb:
   ncbi_id: "OP975389.1"
   target_gene: "F"
   target_regions: ["G", "F"]
-  genome_score_threshold:
-    A: 70
-    B: 150
-    C: 500
-  private_mutation_score_threshold:
-    A: 5
-    B: 30
-    C: 60
+  private_mutation_total_threshold: 5
 flu-h1n1-ha-CY121680:
   dataset: "nextstrain/flu/h1n1pdm/ha/CY121680"
   tag: "2025-09-09--12-13-13Z"
@@ -94,10 +73,7 @@ flu-h1n1-ha-CY121680:
   ncbi_id: "CY121680.1"
   target_gene: "HA1"
   target_regions: ["HA1", "SigPep"]
-  private_mutation_score_threshold:
-    A: 80
-    B: 700
-    C: 1200
+  private_mutation_total_threshold: 80
 flu-h1n1-ha-MW626062:
   dataset: "nextstrain/flu/h1n1pdm/ha/MW626062"
   tag: "2025-09-09--12-13-13Z"
@@ -106,10 +82,7 @@ flu-h1n1-ha-MW626062:
   ncbi_id: "MW626062.1"
   target_gene: "HA1"
   target_regions: ["HA1", "SigPep"]
-  private_mutation_score_threshold:
-    A: 80
-    B: 700
-    C: 1200
+  private_mutation_total_threshold: 80
 flu-h1n1-mp:
   dataset: "nextstrain/flu/h1n1pdm/mp"
   tag: "2025-09-09--12-13-13Z"
@@ -126,14 +99,7 @@ flu-h1n1-na:
   ncbi_id: "MW626056.1"
   target_gene: "NA"
   target_regions: ["NA"]
-  genome_score_threshold:
-    A: 30
-    B: 150
-    C: 400
-  private_mutation_score_threshold:
-    A: 35
-    B: 500
-    C: 1300
+  private_mutation_total_threshold: 35
 flu-h1n1-np:
   dataset: "nextstrain/flu/h1n1pdm/np"
   tag: "2025-09-09--12-13-13Z"
@@ -182,10 +148,7 @@ flu-h3n2-ha-CY163680:
   ncbi_id: "CY163680.1"
   target_gene: "HA1"
   target_regions: ["HA1", "SigPep"]
-  private_mutation_score_threshold:
-    A: 80
-    B: 700
-    C: 1200
+  private_mutation_total_threshold: 80
 flu-h3n2-ha-EPI1857216:
   dataset: "nextstrain/flu/h3n2/ha/EPI1857216"
   tag: "2025-09-09--12-13-13Z"
@@ -194,10 +157,7 @@ flu-h3n2-ha-EPI1857216:
   ncbi_id: "PX230021.1"
   target_gene: "HA1"
   target_regions: ["HA1", "SigPep"]
-  private_mutation_score_threshold:
-    A: 80
-    B: 700
-    C: 1200
+  private_mutation_total_threshold: 80
 flu-h3n2-mp:
   dataset: "nextstrain/flu/h3n2/mp"
   tag: "2025-09-09--12-13-13Z"
@@ -214,10 +174,7 @@ flu-h3n2-na:
   ncbi_id: "OQ718998.1"
   target_gene: "NA"
   target_regions: ["NA"]
-  private_mutation_score_threshold:
-    A: 35
-    B: 500
-    C: 1300
+  private_mutation_total_threshold: 35
 flu-h3n2-np:
   dataset: "nextstrain/flu/h3n2/np"
   tag: "2025-09-09--12-13-13Z"
