@@ -6,7 +6,7 @@ denv1:
   ncbi_id: "NC_001477.1"
   target_gene: "E"
   target_regions: ["C","prM","E"]
-  private_mutation_total_threshold: 45
+  private_mutation_total_threshold: 70
 denv2:
   dataset: "community/v-gen-lab/dengue/denv2"
   tag: "2025-03-26--11-47-13Z"
@@ -55,7 +55,7 @@ rsva:
   ncbi_id: "PP109421.1"
   target_gene: "F"
   target_regions: ["G", "F"]
-  private_mutation_total_threshold: 20
+  private_mutation_total_threshold: 80
 rsvb:
   dataset: "nextstrain/rsv/b/EPI_ISL_1653999"
   tag: "2025-03-04--17-31-25Z"
@@ -64,7 +64,7 @@ rsvb:
   ncbi_id: "OP975389.1"
   target_gene: "F"
   target_regions: ["G", "F"]
-  private_mutation_total_threshold: 5
+  private_mutation_total_threshold: 50
 flu-h1n1-ha-CY121680:
   dataset: "nextstrain/flu/h1n1pdm/ha/CY121680"
   tag: "2025-09-09--12-13-13Z"
@@ -73,7 +73,7 @@ flu-h1n1-ha-CY121680:
   ncbi_id: "CY121680.1"
   target_gene: "HA1"
   target_regions: ["HA1", "SigPep"]
-  private_mutation_total_threshold: 80
+  private_mutation_total_threshold: 10
 flu-h1n1-ha-MW626062:
   dataset: "nextstrain/flu/h1n1pdm/ha/MW626062"
   tag: "2025-09-09--12-13-13Z"
@@ -82,7 +82,7 @@ flu-h1n1-ha-MW626062:
   ncbi_id: "MW626062.1"
   target_gene: "HA1"
   target_regions: ["HA1", "SigPep"]
-  private_mutation_total_threshold: 80
+  private_mutation_total_threshold: 10
 flu-h1n1-mp:
   dataset: "nextstrain/flu/h1n1pdm/mp"
   tag: "2025-09-09--12-13-13Z"
@@ -99,7 +99,7 @@ flu-h1n1-na:
   ncbi_id: "MW626056.1"
   target_gene: "NA"
   target_regions: ["NA"]
-  private_mutation_total_threshold: 35
+  private_mutation_total_threshold: 11
 flu-h1n1-np:
   dataset: "nextstrain/flu/h1n1pdm/np"
   tag: "2025-09-09--12-13-13Z"
@@ -148,7 +148,7 @@ flu-h3n2-ha-CY163680:
   ncbi_id: "CY163680.1"
   target_gene: "HA1"
   target_regions: ["HA1", "SigPep"]
-  private_mutation_total_threshold: 80
+  private_mutation_total_threshold: 10
 flu-h3n2-ha-EPI1857216:
   dataset: "nextstrain/flu/h3n2/ha/EPI1857216"
   tag: "2025-09-09--12-13-13Z"
@@ -157,7 +157,7 @@ flu-h3n2-ha-EPI1857216:
   ncbi_id: "PX230021.1"
   target_gene: "HA1"
   target_regions: ["HA1", "SigPep"]
-  private_mutation_total_threshold: 80
+  private_mutation_total_threshold: 10
 flu-h3n2-mp:
   dataset: "nextstrain/flu/h3n2/mp"
   tag: "2025-09-09--12-13-13Z"
@@ -174,7 +174,7 @@ flu-h3n2-na:
   ncbi_id: "OQ718998.1"
   target_gene: "NA"
   target_regions: ["NA"]
-  private_mutation_total_threshold: 35
+  private_mutation_total_threshold: 11
 flu-h3n2-np:
   dataset: "nextstrain/flu/h3n2/np"
   tag: "2025-09-09--12-13-13Z"
@@ -213,5 +213,89 @@ flu-h3n2-pb2:
   virus_name: "Influenza A H3N2"
   segment: "PB2"
   ncbi_id: "NC_007373.1"
+  target_gene: "PB2"
+  target_regions: ["PB2"]
+flu-vic-ha:
+  dataset: "nextstrain/flu/vic/ha/KX058884"
+  tag: "2025-09-09--12-13-13Z"
+  virus_name: "Influenza B"
+  segment: "HA"
+  ncbi_id: "KX058884.1"
+  target_gene: "HA1"
+  target_regions: ["HA1", "SigPep"]
+  private_mutation_total_threshold: 10
+flu-yam-ha:
+  dataset: "nextstrain/flu/yam/ha/JN993010"
+  tag: "2025-09-09--12-13-13Z"
+  virus_name: "Influenza B"
+  segment: "HA"
+  ncbi_id: "JN993010.1"
+  target_gene: "HA1"
+  target_regions: ["HA1", "SigPep"]
+  private_mutation_total_threshold: 10
+flu-vic-na:
+  dataset: "nextstrain/flu/vic/na/CY073894"
+  tag: "2025-09-09--12-13-13Z"
+  virus_name: "Influenza B"
+  segment: "NA"
+  ncbi_id: "CY073894.1"
+  target_gene: "NA"
+  target_regions: ["NA"]
+  private_mutation_total_threshold: 10
+flu-vic-mp:
+  dataset: "nextstrain/flu/vic/mp"
+  tag: "2025-09-09--12-13-13Z"
+  virus_name: "Influenza B"
+  segment: "MP"
+  ncbi_id: "CY115152.1"
+  target_gene: "M1"
+  target_regions: ["M1", "BM2"]
+  private_mutation_total_threshold: 10
+flu-vic-np:
+  dataset: "nextstrain/flu/vic/np"
+  tag: "2025-10-22--18-11-36Z"
+  virus_name: "Influenza B"
+  segment: "NP"
+  ncbi_id: "CY115154.1"
+  target_gene: "NP"
+  target_regions: ["NP"]
+flu-vic-ns:
+  dataset: "nextstrain/flu/vic/ns"
+  tag: "2025-09-09--12-13-13Z"
+  virus_name: "Influenza B"
+  segment: "NS"
+  ncbi_id: "CY115155.1"
+  target_gene: "NS1"
+  target_regions: ["NEP", "NS1"]
+flu-vic-np:
+  dataset: "nextstrain/flu/vic/np"
+  tag: "2025-09-09--12-13-13Z"
+  virus_name: "Influenza B"
+  segment: "NP"
+  ncbi_id: "CY115154.1"
+  target_gene: "NP"
+  target_regions: ["NP"]
+flu-vic-pa:
+  dataset: "nextstrain/flu/vic/pa"
+  tag: "2025-09-09--12-13-13Z"
+  virus_name: "Influenza B"
+  segment: "PA"
+  ncbi_id: "CY115156.1"
+  target_gene: "PA"
+  target_regions: ["PA"]
+flu-vic-pb1:
+  dataset: "nextstrain/flu/vic/pb1"
+  tag: "2025-09-09--12-13-13Z"
+  virus_name: "Influenza B"
+  segment: "PB1"
+  ncbi_id: "CY115157.1"
+  target_gene: "PB1"
+  target_regions: ["PB1"]
+flu-vic-pb1:
+  dataset: "nextstrain/flu/vic/pb2"
+  tag: "2025-09-09--12-13-13Z"
+  virus_name: "Influenza B"
+  segment: "PB2"
+  ncbi_id: "CY115158.1"
   target_gene: "PB2"
   target_regions: ["PB2"]

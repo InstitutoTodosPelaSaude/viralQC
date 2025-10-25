@@ -105,11 +105,11 @@ def format_sc2_clade(df: DataFrame, dataset_name: str) -> DataFrame:
 def get_missing_data_quality(coverage: float) -> str:
     if not notna(coverage):
         return ""
-    elif coverage >= COVERAGES_THRESHOLD.get("A"):
+    elif coverage >= 0.9:
         return "A"
-    elif coverage >= COVERAGES_THRESHOLD.get("B"):
+    elif coverage >= 0.75:
         return "B"
-    elif coverage >= COVERAGES_THRESHOLD.get("C"):
+    elif coverage >= 0.5:
         return "C"
     else:
         return "D"
