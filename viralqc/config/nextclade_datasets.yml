@@ -15,6 +15,7 @@ denv2:
   ncbi_id: "NC_001474.2"
   target_gene: "E"
   target_regions: ["C","prM","E"]
+  private_mutation_total_threshold: 105
 denv3:
   dataset: "community/v-gen-lab/dengue/denv3"
   tag: "2025-03-26--11-47-13Z"
