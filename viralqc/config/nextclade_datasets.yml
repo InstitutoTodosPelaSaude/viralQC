@@ -299,3 +299,12 @@ flu-vic-pb1:
   ncbi_id: "CY115158.1"
   target_gene: "PB2"
   target_regions: ["PB2"]
+chivk:
+  dataset: "community/v-gen-lab/chikV/genotypes"
+  tag: "2025-09-24--07-29-03Z"
+  virus_name: "Chikungunya virus"
+  segment: "Unsegmented"
+  ncbi_id: "NC_004162.2"
+  target_gene: "E1"
+  target_regions: ["C","E3","E2","6K","E1"]
+  private_mutation_total_threshold: 30
