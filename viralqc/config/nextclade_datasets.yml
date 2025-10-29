@@ -24,6 +24,7 @@ denv3:
   ncbi_id: "NC_001475.2"
   target_gene: "E"
   target_regions: ["C","prM","E"]
+  private_mutation_total_threshold: 65
 denv4:
   dataset: "community/v-gen-lab/dengue/denv4"
   tag: "2025-03-26--11-47-13Z"
@@ -32,6 +33,7 @@ denv4:
   ncbi_id: "NC_002640.1"
   target_gene: "E"
   target_regions: ["C","prM","E"]
+  private_mutation_total_threshold: 75
 sarscov2-wuhan:
   dataset: "nextstrain/sars-cov-2/wuhan-hu-1/orfs"
   tag: "2025-06-09--15-42-38Z"
