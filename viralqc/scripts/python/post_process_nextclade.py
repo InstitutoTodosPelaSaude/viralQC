@@ -1,6 +1,6 @@
 import argparse, re, csv, os
 from pathlib import Path
-from pandas import read_csv, concat, DataFrame, notna, Series
+from pandas import read_csv, concat, DataFrame, notna, Series, NA
 from numpy import nan
 from pandas.errors import EmptyDataError
 from yaml import safe_load
@@ -9,6 +9,7 @@ from yaml import safe_load
 TARGET_COLUMNS = {
     "seqName": str,
     "virus": str,
+    "virus_tax_id": "Int64",
     "segment": str,
     "ncbi_id": str,
     "clade": str,
@@ -429,6 +430,7 @@ def format_dfs(files: list[str], config_file: Path) -> list[DataFrame]:
             df = format_sc2_clade(df, virus_dataset)
             df["virus"] = virus_info["virus_name"]
             df["segment"] = virus_info["segment"]
+            df["virus_tax_id"] = virus_info["virus_tax_id"]
             df["ncbi_id"] = virus_info["ncbi_id"]
             df["dataset"] = virus_info["dataset"]
             df["datasetVersion"] = virus_info["tag"]
@@ -440,22 +442,7 @@ def format_dfs(files: list[str], config_file: Path) -> list[DataFrame]:
 
     return dfs
 
-
-def _format_blast_virus_name(virus_name: str) -> str:
-    formatted_virus_name = re.sub(".*_", "", virus_name)
-    formatted_virus_name = re.sub("-", " ", formatted_virus_name)
-
-    return formatted_virus_name
-
-
-def _get_blast_virus_id(virus_name: str) -> str:
-    parts = virus_name.split("_")
-    virus_id = parts[0] + "_" + parts[1]
-
-    return virus_id
-
-
-def create_unmapped_df(unmapped_sequences: Path, blast_results: Path) -> DataFrame:
+def create_unmapped_df(unmapped_sequences: Path, blast_results: Path, blast_metadata: Path) -> DataFrame:
     """
     Create a dataframe of unmapped sequences
 
@@ -499,9 +486,20 @@ def create_unmapped_df(unmapped_sequences: Path, blast_results: Path) -> DataFra
             "qcovs",
             "qcovhsp",
         ]
-        blast_df = read_csv(blast_results, sep="\t", header=None, names=blast_columns)
-        blast_df_sub = blast_df[["seqName", "virus"]]
+        names_metadata = [
+            "virus",
+            "segment",
+            "virus_name",
+            "virus_tax_id",
+            "isolate_lineage"
+        ]
 
+        blast_df = read_csv(blast_results, sep="\t", header=None, names=blast_columns)
+        blast_metadata_df = read_csv(blast_metadata, sep="\t", header=None, names=names_metadata)
+        blast_df_merged = blast_df.merge(
+            blast_metadata_df, on="virus", how="left"
+        )
+        blast_df_sub = blast_df_merged[["seqName", "virus","segment","virus_name","virus_tax_id"]]
         merged = df.merge(
             blast_df_sub, on="seqName", how="left", suffixes=("_df1", "_df2")
         )
@@ -509,8 +507,10 @@ def create_unmapped_df(unmapped_sequences: Path, blast_results: Path) -> DataFra
         final_df = merged.drop(["virus_df1", "virus_df2"], axis=1)
 
         final_df = final_df.copy()
-        final_df["ncbi_id"] = final_df["virus"].apply(_get_blast_virus_id)
-        final_df["virus"] = final_df["virus"].apply(_format_blast_virus_name)
+        final_df["ncbi_id"] = final_df["virus"]
+        final_df["virus"] = final_df["virus_name"]
+        final_df["virus_tax_id"] = final_df["virus_tax_id_df2"].replace({None: NA}).astype('Int64')
+        final_df["segment"] = final_df["segment_df2"]
 
     return final_df
 
@@ -575,6 +575,12 @@ if __name__ == "__main__":
         help="YAML file listing dataset configurations.",
     )
     parser.add_argument(
+        "--blast-metadata",
+        type=Path,
+        required=True,
+        help="Path to blast database metadata tsv file.",
+    ),
+    parser.add_argument(
         "--output",
         type=Path,
         required=True,
@@ -590,6 +596,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     formatted_dfs = format_dfs(args.files, args.config_file)
-    unmapped_df = create_unmapped_df(args.unmapped_sequences, args.blast_results)
+    unmapped_df = create_unmapped_df(args.unmapped_sequences, args.blast_results, args.blast_metadata)
     formatted_dfs.append(unmapped_df)
     write_combined_df(formatted_dfs, args.output, args.output_format)

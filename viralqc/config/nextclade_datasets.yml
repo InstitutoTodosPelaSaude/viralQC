@@ -2,6 +2,7 @@ denv1:
   dataset: "community/v-gen-lab/dengue/denv1"
   tag: "2025-04-02--19-11-08Z"
   virus_name: "Dengue virus type 1"
+  virus_tax_id: 11053
   segment: "Unsegmented"
   ncbi_id: "NC_001477.1"
   target_gene: "E"
@@ -11,6 +12,7 @@ denv2:
   dataset: "community/v-gen-lab/dengue/denv2"
   tag: "2025-03-26--11-47-13Z"
   virus_name: "Dengue virus type 2"
+  virus_tax_id: 11060
   segment: "Unsegmented"
   ncbi_id: "NC_001474.2"
   target_gene: "E"
@@ -20,6 +22,7 @@ denv3:
   dataset: "community/v-gen-lab/dengue/denv3"
   tag: "2025-03-26--11-47-13Z"
   virus_name: "Dengue virus type 3"
+  virus_tax_id: 11069
   segment: "Unsegmented"
   ncbi_id: "NC_001475.2"
   target_gene: "E"
@@ -29,6 +32,7 @@ denv4:
   dataset: "community/v-gen-lab/dengue/denv4"
   tag: "2025-03-26--11-47-13Z"
   virus_name: "Dengue virus type 4"
+  virus_tax_id: 11070
   segment: "Unsegmented"
   ncbi_id: "NC_002640.1"
   target_gene: "E"
@@ -38,6 +42,7 @@ sarscov2-wuhan:
   dataset: "nextstrain/sars-cov-2/wuhan-hu-1/orfs"
   tag: "2025-06-09--15-42-38Z"
   virus_name: "Severe acute respiratory syndrome coronavirus 2"
+  virus_tax_id: 2697049
   segment: "Unsegmented"
   ncbi_id: "MN908947.3"
   target_gene: "S"
@@ -46,6 +51,7 @@ sarscov2-ba:
   dataset: "nextstrain/sars-cov-2/BA.2.86"
   tag: "2025-06-09--15-42-38Z"
   virus_name: "Severe acute respiratory syndrome coronavirus 2"
+  virus_tax_id: 2697049
   segment: "Unsegmented"
   ncbi_id: "MN908947.3"
   target_gene: "S"
@@ -54,6 +60,7 @@ rsva:
   dataset: "nextstrain/rsv/a/EPI_ISL_412866"
   tag: "2024-11-27--02-51-00Z"
   virus_name: "Respiratory syncytial virus A"
+  virus_tax_id: 208893
   segment: "Unsegmented"
   ncbi_id: "PP109421.1"
   target_gene: "F"
@@ -63,6 +70,7 @@ rsvb:
   dataset: "nextstrain/rsv/b/EPI_ISL_1653999"
   tag: "2025-03-04--17-31-25Z"
   virus_name: "Respiratory syncytial virus B"
+  virus_tax_id: 208895
   segment: "Unsegmented"
   ncbi_id: "OP975389.1"
   target_gene: "F"
@@ -72,6 +80,7 @@ flu-h1n1-ha-CY121680:
   dataset: "nextstrain/flu/h1n1pdm/ha/CY121680"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza A H1N1"
+  virus_tax_id: 11320
   segment: "HA"
   ncbi_id: "CY121680.1"
   target_gene: "HA1"
@@ -81,6 +90,7 @@ flu-h1n1-ha-MW626062:
   dataset: "nextstrain/flu/h1n1pdm/ha/MW626062"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza A H1N1"
+  virus_tax_id: 11320
   segment: "HA"
   ncbi_id: "MW626062.1"
   target_gene: "HA1"
@@ -90,6 +100,7 @@ flu-h1n1-mp:
   dataset: "nextstrain/flu/h1n1pdm/mp"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza A H1N1"
+  virus_tax_id: 11320
   segment: "MP"
   ncbi_id: "NC_026431.1"
   target_gene: "M1"
@@ -98,6 +109,7 @@ flu-h1n1-na:
   dataset: "nextstrain/flu/h1n1pdm/na/MW626056"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza A H1N1"
+  virus_tax_id: 11320
   segment: "NA"
   ncbi_id: "MW626056.1"
   target_gene: "NA"
@@ -107,6 +119,7 @@ flu-h1n1-np:
   dataset: "nextstrain/flu/h1n1pdm/np"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza A H1N1"
+  virus_tax_id: 11320
   segment: "NP"
   ncbi_id: "NC_026436.1"
   target_gene: "NP"
@@ -115,6 +128,7 @@ flu-h1n1-ns:
   dataset: "nextstrain/flu/h1n1pdm/ns"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza A H1N1"
+  virus_tax_id: 11320
   segment: "NS"
   ncbi_id: "NC_026432.1"
   target_gene: "NS1"
@@ -123,6 +137,7 @@ flu-h1n1-pa:
   dataset: "nextstrain/flu/h1n1pdm/pa"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza A H1N1"
+  virus_tax_id: 11320
   segment: "PA"
   ncbi_id: "NC_026437.1"
   target_gene: "PA-X"
@@ -131,6 +146,7 @@ flu-h1n1-pb1:
   dataset: "nextstrain/flu/h1n1pdm/pb1"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza A H1N1"
+  virus_tax_id: 11320
   segment: "PB1"
   ncbi_id: "NC_026435.1"
   target_gene: "PB1"
@@ -139,6 +155,7 @@ flu-h1n1-pb2:
   dataset: "nextstrain/flu/h1n1pdm/pb2"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza A H1N1"
+  virus_tax_id: 11320
   segment: "PB2"
   ncbi_id: "NC_026438.1"
   target_gene: "PB2"
@@ -147,6 +164,7 @@ flu-h3n2-ha-CY163680:
   dataset: "nextstrain/flu/h3n2/ha/CY163680"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza A H3N2"
+  virus_tax_id: 11320
   segment: "HA"
   ncbi_id: "CY163680.1"
   target_gene: "HA1"
@@ -156,6 +174,7 @@ flu-h3n2-ha-EPI1857216:
   dataset: "nextstrain/flu/h3n2/ha/EPI1857216"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza A H3N2"
+  virus_tax_id: 11320
   segment: "HA"
   ncbi_id: "PX230021.1"
   target_gene: "HA1"
@@ -165,6 +184,7 @@ flu-h3n2-mp:
   dataset: "nextstrain/flu/h3n2/mp"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza A H3N2"
+  virus_tax_id: 11320
   segment: "MP"
   ncbi_id: "NC_007367.1"
   target_gene: "M1"
@@ -173,6 +193,7 @@ flu-h3n2-na:
   dataset: "nextstrain/flu/h3n2/na/EPI1857215"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza A H3N2"
+  virus_tax_id: 11320
   segment: "NA"
   ncbi_id: "OQ718998.1"
   target_gene: "NA"
@@ -182,6 +203,7 @@ flu-h3n2-np:
   dataset: "nextstrain/flu/h3n2/np"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza A H3N2"
+  virus_tax_id: 11320
   segment: "NP"
   ncbi_id: "NC_007369.1"
   target_gene: "NP"
@@ -190,6 +212,7 @@ flu-h3n2-ns:
   dataset: "nextstrain/flu/h3n2/ns"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza A H3N2"
+  virus_tax_id: 11320
   segment: "NS"
   ncbi_id: "NC_007370.1"
   target_gene: "NS1"
@@ -198,6 +221,7 @@ flu-h3n2-pa:
   dataset: "nextstrain/flu/h3n2/pa"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza A H3N2"
+  virus_tax_id: 11320
   segment: "PA"
   ncbi_id: "NC_007371.1"
   target_gene: "PA-X"
@@ -206,6 +230,7 @@ flu-h3n2-pb1:
   dataset: "nextstrain/flu/h3n2/pb1"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza A H3N2"
+  virus_tax_id: 11320
   segment: "PB1"
   ncbi_id: "NC_007372.1"
   target_gene: "PB1"
@@ -214,6 +239,7 @@ flu-h3n2-pb2:
   dataset: "nextstrain/flu/h3n2/pb2"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza A H3N2"
+  virus_tax_id: 11320
   segment: "PB2"
   ncbi_id: "NC_007373.1"
   target_gene: "PB2"
@@ -222,6 +248,7 @@ flu-vic-ha:
   dataset: "nextstrain/flu/vic/ha/KX058884"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza B"
+  virus_tax_id: 11520
   segment: "HA"
   ncbi_id: "KX058884.1"
   target_gene: "HA1"
@@ -231,6 +258,7 @@ flu-yam-ha:
   dataset: "nextstrain/flu/yam/ha/JN993010"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza B"
+  virus_tax_id: 11520
   segment: "HA"
   ncbi_id: "JN993010.1"
   target_gene: "HA1"
@@ -240,6 +268,7 @@ flu-vic-na:
   dataset: "nextstrain/flu/vic/na/CY073894"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza B"
+  virus_tax_id: 11520
   segment: "NA"
   ncbi_id: "CY073894.1"
   target_gene: "NA"
@@ -249,6 +278,7 @@ flu-vic-mp:
   dataset: "nextstrain/flu/vic/mp"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza B"
+  virus_tax_id: 11520
   segment: "MP"
   ncbi_id: "CY115152.1"
   target_gene: "M1"
@@ -258,6 +288,7 @@ flu-vic-np:
   dataset: "nextstrain/flu/vic/np"
   tag: "2025-10-22--18-11-36Z"
   virus_name: "Influenza B"
+  virus_tax_id: 11520
   segment: "NP"
   ncbi_id: "CY115154.1"
   target_gene: "NP"
@@ -266,6 +297,7 @@ flu-vic-ns:
   dataset: "nextstrain/flu/vic/ns"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza B"
+  virus_tax_id: 11520
   segment: "NS"
   ncbi_id: "CY115155.1"
   target_gene: "NS1"
@@ -274,6 +306,7 @@ flu-vic-np:
   dataset: "nextstrain/flu/vic/np"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza B"
+  virus_tax_id: 11520
   segment: "NP"
   ncbi_id: "CY115154.1"
   target_gene: "NP"
@@ -282,6 +315,7 @@ flu-vic-pa:
   dataset: "nextstrain/flu/vic/pa"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza B"
+  virus_tax_id: 11520
   segment: "PA"
   ncbi_id: "CY115156.1"
   target_gene: "PA"
@@ -290,6 +324,7 @@ flu-vic-pb1:
   dataset: "nextstrain/flu/vic/pb1"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza B"
+  virus_tax_id: 11520
   segment: "PB1"
   ncbi_id: "CY115157.1"
   target_gene: "PB1"
@@ -298,6 +333,7 @@ flu-vic-pb1:
   dataset: "nextstrain/flu/vic/pb2"
   tag: "2025-09-09--12-13-13Z"
   virus_name: "Influenza B"
+  virus_tax_id: 11520
   segment: "PB2"
   ncbi_id: "CY115158.1"
   target_gene: "PB2"
@@ -306,6 +342,7 @@ chivk:
   dataset: "community/v-gen-lab/chikV/genotypes"
   tag: "2025-09-24--07-29-03Z"
   virus_name: "Chikungunya virus"
+  virus_tax_id: 37124
   segment: "Unsegmented"
   ncbi_id: "NC_004162.2"
   target_gene: "E1"

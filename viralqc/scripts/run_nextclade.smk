@@ -15,6 +15,7 @@ rule parameters:
         nextclade_sort_min_score = config["nextclade_sort_min_score"],
         nextclade_sort_min_hits = config["nextclade_sort_min_hits"],
         blast_database = config["blast_database"],
+        blast_database_metadata = config["blast_database_metadata"],
         blast_identity_threshold = config["blast_identity_threshold"],
         threads = config["threads"]
 
@@ -202,7 +203,8 @@ rule post_process_nextclade:
         nextclade_results = get_nextclade_outputs,
         blast_results = rules.blast.output.viruses_identified,
         unmapped_sequences = f"{parameters.output_dir}/unmapped_sequences.txt",
-        config_file = parameters.config_file
+        config_file = parameters.config_file,
+        blast_database_metadata = {parameters.blast_database_metadata}
     params:
         output_format = parameters.output_format
     output:
@@ -215,6 +217,7 @@ rule post_process_nextclade:
             --files {input.nextclade_results} \
             --unmapped-sequences {input.unmapped_sequences} \
             --blast-results {input.blast_results} \
+            --blast-metadata {input.blast_database_metadata} \
             --config-file {input.config_file} \
             --output {output.output_file} \
             --output-format {params.output_format} 2>{log}
