@@ -10,6 +10,8 @@ TARGET_COLUMNS = {
     "seqName": str,
     "virus": str,
     "virus_tax_id": "Int64",
+    "virus_species": str,
+    "virus_species_tax_id": "Int64",
     "segment": str,
     "ncbi_id": str,
     "clade": str,
@@ -429,8 +431,10 @@ def format_dfs(files: list[str], config_file: Path) -> list[DataFrame]:
             virus_info = config[virus_dataset]
             df = format_sc2_clade(df, virus_dataset)
             df["virus"] = virus_info["virus_name"]
-            df["segment"] = virus_info["segment"]
             df["virus_tax_id"] = virus_info["virus_tax_id"]
+            df["virus_species"] = virus_info["virus_species"]
+            df["virus_species_tax_id"] = virus_info["virus_species_tax_id"]
+            df["segment"] = virus_info["segment"]
             df["ncbi_id"] = virus_info["ncbi_id"]
             df["dataset"] = virus_info["dataset"]
             df["datasetVersion"] = virus_info["tag"]
@@ -491,26 +495,38 @@ def create_unmapped_df(unmapped_sequences: Path, blast_results: Path, blast_meta
             "segment",
             "virus_name",
             "virus_tax_id",
-            "isolate_lineage"
+            "species_name",
+            "species_tax_id",
+            "dataset_with_version",
         ]
 
         blast_df = read_csv(blast_results, sep="\t", header=None, names=blast_columns)
         blast_metadata_df = read_csv(blast_metadata, sep="\t", header=None, names=names_metadata)
-        blast_df_merged = blast_df.merge(
-            blast_metadata_df, on="virus", how="left"
-        )
-        blast_df_sub = blast_df_merged[["seqName", "virus","segment","virus_name","virus_tax_id"]]
-        merged = df.merge(
-            blast_df_sub, on="seqName", how="left", suffixes=("_df1", "_df2")
-        )
-        merged["virus"] = merged["virus_df2"].combine_first(merged["virus_df1"])
-        final_df = merged.drop(["virus_df1", "virus_df2"], axis=1)
 
-        final_df = final_df.copy()
-        final_df["ncbi_id"] = final_df["virus"]
-        final_df["virus"] = final_df["virus_name"]
-        final_df["virus_tax_id"] = final_df["virus_tax_id_df2"].replace({None: NA}).astype('Int64')
-        final_df["segment"] = final_df["segment_df2"]
+        blast_df = blast_df.merge(blast_metadata_df, on="virus", how="left")
+        blast_df = blast_df[[
+            "seqName", "virus", "segment", "virus_name", "virus_tax_id",
+            "species_name", "species_tax_id", "dataset_with_version"
+        ]]
+
+
+        merged = df.merge(
+            blast_df, on="seqName", how="left", suffixes=("_df1", "_df2")
+        )
+        merged["virus"] = merged["virus_df2"].fillna(merged["virus_df1"])
+
+        final_df = merged.drop(columns=["virus_df1", "virus_df2"])
+        final_df = final_df.assign(
+            ncbi_id = final_df["virus"],
+            virus = final_df["virus_name"],
+            virus_tax_id = final_df["virus_tax_id_df2"].astype("Int64"),
+            virus_species = final_df["species_name"].fillna("").astype(str),
+            virus_species_tax_id = final_df["species_tax_id"].astype("Int64"),
+            segment = final_df["segment_df2"].fillna("Unsegmented").astype(str),
+        )
+        final_df[["dataset", "datasetVersion"]] = (
+            final_df["dataset_with_version"].str.split("_", n=1, expand=True)
+        )
 
     return final_df
 
