@@ -15,6 +15,7 @@ denv2:
   ncbi_id: "NC_001474.2"
   target_gene: "E"
   target_regions: ["C","prM","E"]
+  private_mutation_total_threshold: 105
 denv3:
   dataset: "community/v-gen-lab/dengue/denv3"
   tag: "2025-03-26--11-47-13Z"
@@ -23,6 +24,7 @@ denv3:
   ncbi_id: "NC_001475.2"
   target_gene: "E"
   target_regions: ["C","prM","E"]
+  private_mutation_total_threshold: 65
 denv4:
   dataset: "community/v-gen-lab/dengue/denv4"
   tag: "2025-03-26--11-47-13Z"
@@ -31,6 +33,7 @@ denv4:
   ncbi_id: "NC_002640.1"
   target_gene: "E"
   target_regions: ["C","prM","E"]
+  private_mutation_total_threshold: 75
 sarscov2-wuhan:
   dataset: "nextstrain/sars-cov-2/wuhan-hu-1/orfs"
   tag: "2025-06-09--15-42-38Z"
@@ -299,3 +302,12 @@ flu-vic-pb1:
   ncbi_id: "CY115158.1"
   target_gene: "PB2"
   target_regions: ["PB2"]
+chivk:
+  dataset: "community/v-gen-lab/chikV/genotypes"
+  tag: "2025-09-24--07-29-03Z"
+  virus_name: "Chikungunya virus"
+  segment: "Unsegmented"
+  ncbi_id: "NC_004162.2"
+  target_gene: "E1"
+  target_regions: ["C","E3","E2","6K","E1"]
+  private_mutation_total_threshold: 30
