@@ -518,9 +518,9 @@ def create_unmapped_df(unmapped_sequences: Path, blast_results: Path, blast_meta
         final_df = merged.drop(columns=["virus_df1", "virus_df2"])
         final_df = final_df.assign(
             ncbi_id = final_df["virus"],
-            virus = final_df["virus_name"],
+            virus = final_df["virus_name"].fillna("Unclassified").astype(str),
             virus_tax_id = final_df["virus_tax_id_df2"].astype("Int64"),
-            virus_species = final_df["species_name"].fillna("").astype(str),
+            virus_species = final_df["species_name"].fillna("Unclassified").astype(str),
             virus_species_tax_id = final_df["species_tax_id"].astype("Int64"),
             segment = final_df["segment_df2"].fillna("Unsegmented").astype(str),
         )
