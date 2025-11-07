@@ -25,6 +25,7 @@ class RunNextclade:
         nextclade_sort_min_score: float,
         nextclade_sort_min_hits: int,
         blast_database: str,
+        blast_database_metadata: str,
         blast_identity_threshold: float,
     ) -> SnakemakeResponse:
         output_format = self._get_output_format(output_file)
@@ -39,6 +40,7 @@ class RunNextclade:
             "nextclade_sort_min_score": nextclade_sort_min_score,
             "nextclade_sort_min_hits": nextclade_sort_min_hits,
             "blast_database": blast_database,
+            "blast_database_metadata": blast_database_metadata,
             "blast_identity_threshold": blast_identity_threshold,
         }
 

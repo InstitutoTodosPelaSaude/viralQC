@@ -101,6 +101,7 @@ async def run(
         nextclade_sort_min_score=nextclade_sort_min_score,
         nextclade_sort_min_hits=nextclade_sort_min_hits,
         blast_database="datasets/blast.fasta",
+        blast_database_metadata="datasets/blast.tsv",
         blast_identity_threshold=identity_threshold,
     )
     with open(f"{output_directory}/results.json", "r") as f:

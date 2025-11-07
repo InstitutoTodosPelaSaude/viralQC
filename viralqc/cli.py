@@ -145,6 +145,11 @@ def run_from_fasta(
         "--blast-database",
         help="Path to local blast database.",
     ),
+    blast_database_metadata: str = typer.Option(
+        "datasets/blast.tsv",
+        "--blast-database-metadata",
+        help="Path to local blast database metadata.",
+    ),
     identity_threshold: str = typer.Option(
         0.90,
         "--identity-threshold",
@@ -166,6 +171,7 @@ def run_from_fasta(
         nextclade_sort_min_score=nextclade_sort_min_score,
         nextclade_sort_min_hits=nextclade_sort_min_hits,
         blast_database=blast_database,
+        blast_database_metadata=blast_database_metadata,
         blast_identity_threshold=identity_threshold,
     )
     if snakemake_response.status == 200:
