@@ -84,7 +84,7 @@ vqc get-blast-database --cores 2
 A output directory name can be specified, the default is `datasets`.
 
 ```bash
-vqc get-nextclade-datasets --cores 2 --output-dir <directory_name>
+vqc get-blast-database --cores 2 --output-dir <directory_name>
 ```
 
 ### run-from-fasta
@@ -116,7 +116,9 @@ The output directory has the following structure:
 ├── <virus/dataset>.nextclade.tsv # Nextclade run output for each identified virus, including clade assignments and QC metrics.
 ├── unmapped_sequences.txt        # Names of input sequences that were not mapped to any virus on nextclade sort.
 ├── unmapped_sequences.blast.tsv  # BLAST results for unmapped sequences.
-└── viruses.tsv                   # Nextclade sort output showing the mapping between input sequences and remote
+├── unmapped_sequences.blast.tsv  # BLAST results for unmapped sequences.
+├── viruses.external_datasets.tsv # Nextclade sort output showing the mapping between input sequences and external (outside nextclade_data) datasets. 
+└── viruses.tsv                   # Nextclade sort output showing the mapping between input sequences and remote (nextclade_data) datasets.
 ```
 
 ## Usage (API)
