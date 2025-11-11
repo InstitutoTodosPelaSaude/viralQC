@@ -428,7 +428,9 @@ def format_dfs(files: list[str], config_file: Path) -> list[DataFrame]:
 
         if not df.empty:
             virus_dataset = re.sub("\.nextclade.tsv", "", re.sub(".*\/", "", file))
-            virus_info = config[virus_dataset]
+            virus_info = config["nextclade_data"].get(
+                virus_dataset, config["github"].get(virus_dataset)
+            )
             df = format_sc2_clade(df, virus_dataset)
             df["virus"] = virus_info["virus_name"]
             df["virus_tax_id"] = virus_info["virus_tax_id"]
@@ -446,7 +448,10 @@ def format_dfs(files: list[str], config_file: Path) -> list[DataFrame]:
 
     return dfs
 
-def create_unmapped_df(unmapped_sequences: Path, blast_results: Path, blast_metadata: Path) -> DataFrame:
+
+def create_unmapped_df(
+    unmapped_sequences: Path, blast_results: Path, blast_metadata: Path
+) -> DataFrame:
     """
     Create a dataframe of unmapped sequences
 
@@ -501,32 +506,39 @@ def create_unmapped_df(unmapped_sequences: Path, blast_results: Path, blast_meta
         ]
 
         blast_df = read_csv(blast_results, sep="\t", header=None, names=blast_columns)
-        blast_metadata_df = read_csv(blast_metadata, sep="\t", header=None, names=names_metadata)
+        blast_metadata_df = read_csv(
+            blast_metadata, sep="\t", header=None, names=names_metadata
+        )
 
         blast_df = blast_df.merge(blast_metadata_df, on="virus", how="left")
-        blast_df = blast_df[[
-            "seqName", "virus", "segment", "virus_name", "virus_tax_id",
-            "species_name", "species_tax_id", "dataset_with_version"
-        ]]
+        blast_df = blast_df[
+            [
+                "seqName",
+                "virus",
+                "segment",
+                "virus_name",
+                "virus_tax_id",
+                "species_name",
+                "species_tax_id",
+                "dataset_with_version",
+            ]
+        ]
 
-
-        merged = df.merge(
-            blast_df, on="seqName", how="left", suffixes=("_df1", "_df2")
-        )
+        merged = df.merge(blast_df, on="seqName", how="left", suffixes=("_df1", "_df2"))
         merged["virus"] = merged["virus_df2"].fillna(merged["virus_df1"])
 
         final_df = merged.drop(columns=["virus_df1", "virus_df2"])
         final_df = final_df.assign(
-            ncbi_id = final_df["virus"],
-            virus = final_df["virus_name"].fillna("Unclassified").astype(str),
-            virus_tax_id = final_df["virus_tax_id_df2"].astype("Int64"),
-            virus_species = final_df["species_name"].fillna("Unclassified").astype(str),
-            virus_species_tax_id = final_df["species_tax_id"].astype("Int64"),
-            segment = final_df["segment_df2"].fillna("Unsegmented").astype(str),
+            ncbi_id=final_df["virus"],
+            virus=final_df["virus_name"].fillna("Unclassified").astype(str),
+            virus_tax_id=final_df["virus_tax_id_df2"].astype("Int64"),
+            virus_species=final_df["species_name"].fillna("Unclassified").astype(str),
+            virus_species_tax_id=final_df["species_tax_id"].astype("Int64"),
+            segment=final_df["segment_df2"].fillna("Unsegmented").astype(str),
         )
-        final_df[["dataset", "datasetVersion"]] = (
-            final_df["dataset_with_version"].str.split("_", n=1, expand=True)
-        )
+        final_df[["dataset", "datasetVersion"]] = final_df[
+            "dataset_with_version"
+        ].str.split("_", n=1, expand=True)
 
     return final_df
 
@@ -612,6 +624,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     formatted_dfs = format_dfs(args.files, args.config_file)
-    unmapped_df = create_unmapped_df(args.unmapped_sequences, args.blast_results, args.blast_metadata)
+    unmapped_df = create_unmapped_df(
+        args.unmapped_sequences, args.blast_results, args.blast_metadata
+    )
     formatted_dfs.append(unmapped_df)
     write_combined_df(formatted_dfs, args.output, args.output_format)

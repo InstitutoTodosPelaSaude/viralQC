@@ -12,6 +12,7 @@ rule parameters:
         output_format = config["output_format"],
         config_file = config["config_file"],
         datasets_local_path = config["datasets_local_path"],
+        external_datasets_minimizers = f"{config['datasets_local_path']}/external_datasets_minimizers.json",
         nextclade_sort_min_score = config["nextclade_sort_min_score"],
         nextclade_sort_min_hits = config["nextclade_sort_min_hits"],
         blast_database = config["blast_database"],
@@ -66,13 +67,15 @@ rule nextclade_sort:
     message:
         "Run nextclade sort to identify datasets"
     input:
-        sequences = parameters.sequences_fasta
+        sequences = parameters.sequences_fasta,
+        external_datasets_minimizers = parameters.external_datasets_minimizers
     params:
         output_dir = parameters.output_dir,
         min_score = parameters.nextclade_sort_min_score,
         min_hits = parameters.nextclade_sort_min_hits
     output:
-        viruses_identified =  f"{parameters.output_dir}/viruses.tsv"
+        viruses_identified =  f"{parameters.output_dir}/viruses.tsv",
+        viruses_identified_external =  f"{parameters.output_dir}/viruses.external_datasets.tsv"
     threads:
         parameters.threads
     log:
@@ -87,6 +90,30 @@ rule nextclade_sort:
             --min-score {params.min_score} \
             --min-hits {params.min_hits} \
             --jobs {threads} 2>{log}
+
+        # Run nextclade sort again using only sequences that were not mapped in the datasets from nextclade_data
+        awk -F"\\t" '{{if ($3 == "") print $2}}' \
+            {output.viruses_identified} > \
+            {params.output_dir}/tmp_unmapped_sequences.txt
+
+        if [ -s {params.output_dir}/tmp_unmapped_sequences.txt ]; then
+            seqtk subseq {input.sequences} {params.output_dir}/tmp_unmapped_sequences.txt > \
+                {params.output_dir}/tmp_unmapped_sequences.fasta
+        fi
+
+        if [ -s {params.output_dir}/tmp_unmapped_sequences.fasta ]; then
+            nextclade sort {params.output_dir}/tmp_unmapped_sequences.fasta \
+                --input-minimizer-index-json {input.external_datasets_minimizers} \
+                --output-path '{params.output_dir}/{{name}}/sequences.fa' \
+                --output-results-tsv {output.viruses_identified_external} \
+                --min-score {params.min_score} \
+                --min-hits {params.min_hits} \
+                --jobs {threads} 2>>{log}
+        else
+            echo -e "seqName\tdataset\tscore\tnumHits" > {output.viruses_identified_external}
+        fi
+
+        rm {params.output_dir}/tmp_unmapped_sequences.*
         """
 
 checkpoint select_datasets_from_nextclade:
@@ -94,6 +121,7 @@ checkpoint select_datasets_from_nextclade:
         "Select datasets based on nextclade sort output."
     input:
         viruses_identified = rules.nextclade_sort.output.viruses_identified,
+        viruses_identified_external = rules.nextclade_sort.output.viruses_identified_external,
         config_file = parameters.config_file,
     params:
         datasets_local_path = parameters.datasets_local_path,
@@ -107,6 +135,7 @@ checkpoint select_datasets_from_nextclade:
         """
         python {PKG_PATH}/scripts/python/format_nextclade_sort.py \
             --nextclade-output {input.viruses_identified} \
+            --nextclade-external-output {input.viruses_identified_external} \
             --config-file {input.config_file} \
             --local-datasets-path {params.datasets_local_path}/ \
             --output-path {params.output_dir} 
@@ -192,6 +221,7 @@ rule nextclade:
             --input-dataset {input.dataset} \
             --output-tsv {output.nextclade_tsv} \
             --output-annotation-gff {output.nextclade_gff} \
+            --min-seed-cover 0.05 \
             --jobs {threads} \
             {input.fasta} 2>{log}
         """
