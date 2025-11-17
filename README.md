@@ -22,7 +22,9 @@ micromamba install \
   "snakemake-minimal>=7.32.0,<7.33.0" \
   "blast>=2.16.0,<2.17.0" \
   "nextclade>=3.15.0,<3.16.0" \
-  "seqtk>=1.5.0,<1.6.0"
+  "seqtk>=1.5.0,<1.6.0" \
+  "ncbi-datasets-cli>=18.9.0,<18.10.0" \
+  "taxonkit>=0.20.0,<0.21.0"
 ```
 
 Then, install viralQC
