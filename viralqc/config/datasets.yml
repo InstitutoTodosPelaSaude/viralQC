@@ -437,3 +437,81 @@ github:
     target_gene: "E"
     target_regions: ["C","prM","E"]
     private_mutation_total_threshold: 40
+  orov-tefe-l:
+    repository: "dezordi/nextclade_data_workflows"
+    dataset: "orov/datasets/L/tefe"
+    tag: "development"
+    virus_name: "Oropouche virus"
+    virus_tax_id: 118655
+    virus_species: "Orthobunyavirus oropoucheense"
+    virus_species_tax_id: 3052429
+    segment: "L"
+    ncbi_id: "PP154172.1"
+    target_gene: "L"
+    target_regions: ["L"]
+    private_mutation_total_threshold: 15
+  orov-refseq-l:
+    repository: "dezordi/nextclade_data_workflows"
+    dataset: "orov/datasets/L/refseq"
+    tag: "development"
+    virus_name: "Oropouche virus"
+    virus_tax_id: 118655
+    virus_species: "Orthobunyavirus oropoucheense"
+    virus_species_tax_id: 3052429
+    segment: "L"
+    ncbi_id: "NC_005776.1"
+    target_gene: "L"
+    target_regions: ["L"]
+    private_mutation_total_threshold: 15
+  orov-tefe-m:
+    repository: "dezordi/nextclade_data_workflows"
+    dataset: "orov/datasets/M/tefe"
+    tag: "development"
+    virus_name: "Oropouche virus"
+    virus_tax_id: 118655
+    virus_species: "Orthobunyavirus oropoucheense"
+    virus_species_tax_id: 3052429
+    segment: "M"
+    ncbi_id: "PP154171.1"
+    target_gene: "M"
+    target_regions: ["M"]
+    private_mutation_total_threshold: 15
+  orov-refseq-m:
+    repository: "dezordi/nextclade_data_workflows"
+    dataset: "orov/datasets/M/refseq"
+    tag: "development"
+    virus_name: "Oropouche virus"
+    virus_tax_id: 118655
+    virus_species: "Orthobunyavirus oropoucheense"
+    virus_species_tax_id: 3052429
+    segment: "M"
+    ncbi_id: "NC_005775.1"
+    target_gene: "M"
+    target_regions: ["M"]
+    private_mutation_total_threshold: 15
+  orov-tefe-s:
+    repository: "dezordi/nextclade_data_workflows"
+    dataset: "orov/datasets/S/tefe"
+    tag: "development"
+    virus_name: "Oropouche virus"
+    virus_tax_id: 118655
+    virus_species: "Orthobunyavirus oropoucheense"
+    virus_species_tax_id: 3052429
+    segment: "S"
+    ncbi_id: "PP154170.1"
+    target_gene: "N"
+    target_regions: ["N","NSs"]
+    private_mutation_total_threshold: 15
+  orov-refseq-s:
+    repository: "dezordi/nextclade_data_workflows"
+    dataset: "orov/datasets/S/refseq"
+    tag: "development"
+    virus_name: "Oropouche virus"
+    virus_tax_id: 118655
+    virus_species: "Orthobunyavirus oropoucheense"
+    virus_species_tax_id: 3052429
+    segment: "S"
+    ncbi_id: "NC_005777.1"
+    target_gene: "N"
+    target_regions: ["N","NSs"]
+    private_mutation_total_threshold: 15

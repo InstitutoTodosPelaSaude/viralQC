@@ -1,51 +1,50 @@
-import github
 import os
-import base64
 import argparse
+import zipfile
 import requests
+import tempfile
 
 
 def download_dataset(repo_path: str, dataset_name: str, output_dir: str) -> None:
     """
-    Download entire folder from GitHub with minimal API calls
+    Download a GitHub folder without using the GitHub API.
 
     Args:
         repo_path (str): "owner/repo"
         dataset_name (str): Path to folder in repository
         output_dir (str): Local directory to save files
     """
-    g = github.Github()
-    repo = g.get_repo(repo_path)
+    owner = repo_path.split("/")[0]
+    repo = repo_path.split("/")[1]
+
+    zip_url = f"https://codeload.github.com/{owner}/{repo}/zip/refs/heads/main"
+    resp = requests.get(zip_url, stream=True)
+
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        for chunk in resp.iter_content(1024 * 64):
+            tmp.write(chunk)
+        zip_path = tmp.name
+
+    zip_prefix = f"{repo}-main/{dataset_name}/"
     os.makedirs(output_dir, exist_ok=True)
 
-    contents = repo.get_contents(dataset_name)
-    for file_content in contents:
-        local_path = os.path.join(output_dir, file_content.name)
+    with zipfile.ZipFile(zip_path) as zf:
+        for name in zf.namelist():
+            if (
+                name.startswith(zip_prefix)
+                and name != zip_prefix
+                and not name.endswith("/")
+            ):
+                relative_name = name[len(zip_prefix) :]
+                # ignore files in subfolders (non-recursive)
+                if "/" in relative_name:
+                    continue
 
-        if file_content.encoding == "base64" and file_content.content:
-            content = base64.b64decode(file_content.content)
-        elif (
-            file_content.encoding == "none"
-            and hasattr(file_content, "_json_data")
-            and "content" in file_content._json_data
-        ):
-            raw_content = file_content._json_data["content"]
-            if raw_content:
-                content = base64.b64decode(raw_content)
-            else:
-                raise Exception("No content in JSON data")
-        else:
-            file_data = repo.get_contents(file_content.path)
-            if file_data.encoding == "base64" and file_data.content:
-                content = base64.b64decode(file_data.content)
-            else:
-                raw_url = f"https://raw.githubusercontent.com/{repo_path}/main/{file_content.path}"
-                response = requests.get(raw_url)
-                if response.status_code == 200:
-                    content = response.content
+                out_file = os.path.join(output_dir, relative_name)
+                with zf.open(name) as src, open(out_file, "wb") as dst:
+                    dst.write(src.read())
 
-        with open(local_path, "wb") as f:
-            f.write(content)
+    os.remove(zip_path)
 
 
 if __name__ == "__main__":
