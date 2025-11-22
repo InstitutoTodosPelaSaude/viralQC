@@ -184,20 +184,3 @@ This is the main analysis command. It takes a FASTA file of query sequences and 
 6.  **Target Region Extraction:** Finally, specific genomic regions of interest (if defined) are extracted from the sequences based on quality criteria.
 
 ![run-from-fasta](assets/run_from_fasta.svg)
-
-## Usage (API)
-
-```bash
-vqc-server
-```
-
-Go to `http://127.0.0.1:8000/docs`
-
-### Development
-
-Install development dependencies and run `black` into `viralqc` directory.
-
-```bash
-pip install -e ".[dev]"
-black viralqc
-```
