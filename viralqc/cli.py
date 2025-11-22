@@ -78,12 +78,6 @@ def get_nextclade_datasets(
 
 
 @app.command()
-def get_custom_datasets(cores: int = 1):
-    """Get custom virus datasets"""
-    print("In progress")
-
-
-@app.command()
 def get_blast_database(
     output_dir: str = typer.Option(
         "datasets",

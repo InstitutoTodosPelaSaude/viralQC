@@ -139,3 +139,65 @@ Install development dependencies and run `black` into `viralqc` directory.
 pip install -e ".[dev]"
 black viralqc
 ```
+
+## Commands Logic
+
+### get-nextclade-datasets
+
+This command is responsible for downloading and configuring the Nextclade datasets required for analysis. It reads a configuration file (`config/datasets.yml`) to determine which datasets to fetch.
+
+**Logic:**
+1.  **Read Configuration:** The command reads the `config/datasets.yml` file to identify the list of viruses and their corresponding Nextclade dataset names or GitHub repositories.
+2.  **Download Nextclade Datasets:** For viruses hosted on Nextclade's official repository, it uses the `nextclade dataset get` command to download the reference sequence, gene map, and other necessary files.
+3.  **Download GitHub Datasets:** For viruses hosted on GitHub, it uses a custom Python script (`get_github_dataset.py`) to download the dataset files.
+4.  **Generate Minimizer Index:** For the GitHub datasets, it generates a minimizer index (`external_datasets_minimizers.json`) using `get_minimizer_index.py`. This index is crucial for the `nextclade sort` step to recognize these external datasets.
+
+![get-nextclade-datasets](assets/get_nextclade_datasets.svg)
+
+### get-blast-database
+
+This command builds a local BLAST database containing all viral genomes from NCBI RefSeq. This database is used to identify sequences that are not recognized by Nextclade's default datasets.
+
+**Logic:**
+1.  **Download Genomes:** It downloads all viral genomes from NCBI RefSeq using the `datasets` CLI tool.
+2.  **Format Database:** It processes the downloaded files to create a FASTA file (`blast.fasta`) and extracts metadata (accession, virus name, taxonomy ID) into a TSV file (`blast.tsv`).
+3.  **Taxonomy Information:** It downloads NCBI taxonomy data and uses `taxonkit` to add species names and taxonomy IDs to the metadata.
+4.  **Create BLAST DB:** It uses `makeblastdb` to create the searchable BLAST database.
+5.  **Generate GFFs:** It converts the JSONL annotation reports from NCBI into GFF3 format using `jsonl_to_gff.py`. **Crucially**, this step filters out accessions where the CDS length is not divisible by 3 or other structural anomalies, ensuring that only valid annotations are used for generic Nextclade runs.
+
+![get-blast-database](assets/get_blast_database.svg)
+
+### run-from-fasta
+
+This is the main analysis command. It takes a FASTA file of query sequences and performs virus identification, clade assignment, and quality control.
+
+**Logic:**
+1.  **Nextclade Sort:** The input sequences are first passed to `nextclade sort`. This tool compares the sequences against the local Nextclade datasets (including the external ones via the minimizer index) to identify which virus each sequence belongs to.
+2.  **Datasets Identification:**: Identify the virus/dataset that each sequence belongs to with format_nextclade_sort.py
+    *   **Mapped Sequences:** Sequences that match a known dataset are assigned to that virus.
+    *   **Unmapped Sequences:** Sequences that do not match any dataset are flagged as "unmapped".
+3.  **BLAST Analysis:** The unmapped sequences are queried against the local BLAST database (`blastn`) to identify their closest viral match.
+4.  **Nextclade Analysis:**
+    *   **A. Standard Run:** For sequences mapped to a known Nextclade dataset, `nextclade run` is executed using that dataset.
+    *   **B. Generic Run:** For sequences identified by BLAST (but not in the Nextclade datasets), a "generic" `nextclade run` is performed. This uses the reference sequence and GFF annotation from the BLAST database (created by `get-blast-database`).
+5.  **Post-Processing:** The results from all `nextclade run` executions (standard and generic) and the BLAST results for any remaining unmapped sequences are combined into a single output file (`results.tsv`).
+6.  **Target Region Extraction:** Finally, specific genomic regions of interest (if defined) are extracted from the sequences based on quality criteria.
+
+![run-from-fasta](assets/run_from_fasta.svg)
+
+## Usage (API)
+
+```bash
+vqc-server
+```
+
+Go to `http://127.0.0.1:8000/docs`
+
+### Development
+
+Install development dependencies and run `black` into `viralqc` directory.
+
+```bash
+pip install -e ".[dev]"
+black viralqc
+```
