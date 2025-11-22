@@ -1,6 +1,7 @@
 from viralqc import PKG_PATH
 import csv
 import logging
+import os
 
 logging.basicConfig(level=logging.WARNING, format='%(levelname)s:%(message)s')
 
@@ -22,16 +23,11 @@ rule parameters:
 
 parameters = rules.parameters.params
 
-# Checkpoint to ensure datasets_selected.tsv is processed
-checkpoint create_datasets_selected:
-    input:
-        ""
-    output:
-        tsv = f"{parameters.output_dir}/datasets_selected.tsv"
+
 
 count_get_nextclade_outputs_run = 0
 def get_nextclade_outputs(wildcards):
-    datasets_selected_file = checkpoints.create_datasets_selected.get(**wildcards).output.tsv
+    datasets_selected_file = checkpoints.select_datasets_from_nextclade.get(**wildcards).output.datasets_selected
     viruses = set()
     dataset_not_found = []
     global count_get_nextclade_outputs_run
@@ -47,7 +43,7 @@ def get_nextclade_outputs(wildcards):
                     logging.warning(f"The '{row['dataset']}' dataset was not found locally.")
                     dataset_not_found.append(row['dataset'])
 
-    nextclade_results = [f"{parameters.output_dir}/{virus}.nextclade.tsv" for virus in viruses]
+    nextclade_results = [f"{parameters.output_dir}/nextclade_results/{virus}.nextclade.tsv" for virus in viruses]
     if not nextclade_results and count_get_nextclade_outputs_run == 0:
         logging.warning(f"Nextclade will not run for any input sequence.")
     count_get_nextclade_outputs_run += 1
@@ -55,9 +51,9 @@ def get_nextclade_outputs(wildcards):
 
 rule all:
     input:
-        viruses_identified = f"{parameters.output_dir}/viruses.tsv",
-        datasets_selected = f"{parameters.output_dir}/datasets_selected.tsv",
-        unmapped_sequences = f"{parameters.output_dir}/unmapped_sequences.txt",
+        viruses_identified = f"{parameters.output_dir}/identified_datasets/viruses.tsv",
+        datasets_selected = f"{parameters.output_dir}/identified_datasets/datasets_selected.tsv",
+        unmapped_sequences = f"{parameters.output_dir}/identified_datasets/unmapped_sequences.txt",
         nextclade_outputs = get_nextclade_outputs,
         output = f"{parameters.output_dir}/{parameters.output_file}",
         target_regions_bed = f"{parameters.output_dir}/sequences_target_regions.bed",
@@ -74,18 +70,18 @@ rule nextclade_sort:
         min_score = parameters.nextclade_sort_min_score,
         min_hits = parameters.nextclade_sort_min_hits
     output:
-        viruses_identified =  f"{parameters.output_dir}/viruses.tsv",
-        viruses_identified_external =  f"{parameters.output_dir}/viruses.external_datasets.tsv"
+        viruses_identified =  f"{parameters.output_dir}/identified_datasets/viruses.tsv",
+        viruses_identified_external =  f"{parameters.output_dir}/identified_datasets/viruses.external_datasets.tsv"
     threads:
         parameters.threads
     log:
         "logs/nextclade_sort.log"
     shell:
         """
-        mkdir -p {params.output_dir}
+        mkdir -p {params.output_dir}/identified_datasets
 
         nextclade sort {input.sequences} \
-            --output-path '{params.output_dir}/{{name}}/sequences.fa' \
+            --output-path '{params.output_dir}/identified_datasets/{{name}}/sequences.fa' \
             --output-results-tsv {output.viruses_identified} \
             --min-score {params.min_score} \
             --min-hits {params.min_hits} \
@@ -94,17 +90,17 @@ rule nextclade_sort:
         # Run nextclade sort again using only sequences that were not mapped in the datasets from nextclade_data
         awk -F"\\t" '{{if ($3 == "") print $2}}' \
             {output.viruses_identified} > \
-            {params.output_dir}/tmp_unmapped_sequences.txt
+            {params.output_dir}/identified_datasets/tmp_unmapped_sequences.txt
 
-        if [ -s {params.output_dir}/tmp_unmapped_sequences.txt ]; then
-            seqtk subseq {input.sequences} {params.output_dir}/tmp_unmapped_sequences.txt > \
-                {params.output_dir}/tmp_unmapped_sequences.fasta
+        if [ -s {params.output_dir}/identified_datasets/tmp_unmapped_sequences.txt ]; then
+            seqtk subseq {input.sequences} {params.output_dir}/identified_datasets/tmp_unmapped_sequences.txt > \
+                {params.output_dir}/identified_datasets/tmp_unmapped_sequences.fasta
         fi
 
-        if [ -s {params.output_dir}/tmp_unmapped_sequences.fasta ]; then
-            nextclade sort {params.output_dir}/tmp_unmapped_sequences.fasta \
+        if [ -s {params.output_dir}/identified_datasets/tmp_unmapped_sequences.fasta ]; then
+            nextclade sort {params.output_dir}/identified_datasets/tmp_unmapped_sequences.fasta \
                 --input-minimizer-index-json {input.external_datasets_minimizers} \
-                --output-path '{params.output_dir}/{{name}}/sequences.fa' \
+                --output-path '{params.output_dir}/identified_datasets/{{name}}/sequences.fa' \
                 --output-results-tsv {output.viruses_identified_external} \
                 --min-score {params.min_score} \
                 --min-hits {params.min_hits} \
@@ -113,7 +109,7 @@ rule nextclade_sort:
             echo -e "seqName\tdataset\tscore\tnumHits" > {output.viruses_identified_external}
         fi
 
-        rm {params.output_dir}/tmp_unmapped_sequences.*
+        rm {params.output_dir}/identified_datasets/tmp_unmapped_sequences.*
         """
 
 checkpoint select_datasets_from_nextclade:
@@ -127,8 +123,8 @@ checkpoint select_datasets_from_nextclade:
         datasets_local_path = parameters.datasets_local_path,
         output_dir = parameters.output_dir
     output:
-        datasets_selected = f"{parameters.output_dir}/datasets_selected.tsv",
-        unmapped_sequences = f"{parameters.output_dir}/unmapped_sequences.txt"
+        datasets_selected = f"{parameters.output_dir}/identified_datasets/datasets_selected.tsv",
+        unmapped_sequences = f"{parameters.output_dir}/identified_datasets/unmapped_sequences.txt"
     threads:
         parameters.threads
     shell:
@@ -138,7 +134,7 @@ checkpoint select_datasets_from_nextclade:
             --nextclade-external-output {input.viruses_identified_external} \
             --config-file {input.config_file} \
             --local-datasets-path {params.datasets_local_path}/ \
-            --output-path {params.output_dir} 
+            --output-path {params.output_dir}/identified_datasets 
         """
 
 
@@ -150,19 +146,21 @@ rule blast:
         unmapped_sequences = rules.select_datasets_from_nextclade.output.unmapped_sequences,
         blast_database = parameters.blast_database
     params:
-        identity_threshold = parameters.blast_identity_threshold
+        identity_threshold = parameters.blast_identity_threshold,
+        output_dir = parameters.output_dir
     output:
-        viruses_identified = f"{parameters.output_dir}/unmapped_sequences.blast.tsv",
+        viruses_identified = f"{parameters.output_dir}/blast_results/unmapped_sequences.blast.tsv",
     threads:
         parameters.threads
     log:
         "logs/blast.log"
     shell:
         """
+        mkdir -p {params.output_dir}/blast_results
         if [ -s {input.unmapped_sequences} ]; then
-            seqtk subseq {input.sequences} {input.unmapped_sequences} > unmapped_sequences.fasta
+            seqtk subseq {input.sequences} {input.unmapped_sequences} > {params.output_dir}/blast_results/unmapped_sequences.fasta
             blastn -db {input.blast_database} \
-                -query unmapped_sequences.fasta \
+                -query {params.output_dir}/blast_results/unmapped_sequences.fasta \
                 -out {output.viruses_identified} \
                 -task megablast \
                 -evalue 0.001 \
@@ -171,7 +169,7 @@ rule blast:
                 -max_target_seqs 1 \
                 -perc_identity {params.identity_threshold} \
                 -num_threads {threads} 2> {log}
-            rm unmapped_sequences.fasta
+            rm {params.output_dir}/blast_results/unmapped_sequences.fasta
         else
             touch {output.viruses_identified}
         fi
@@ -182,7 +180,7 @@ def get_virus_info(wildcards, field):
     global virus_info
     if virus_info is None:
         virus_info = {}
-        datasets_selected_file = checkpoints.create_datasets_selected.get().output.tsv
+        datasets_selected_file = checkpoints.select_datasets_from_nextclade.get().output.datasets_selected
         with open(datasets_selected_file, 'r') as f:
             reader = csv.DictReader(f, delimiter='\t')
             for row in reader:
@@ -209,8 +207,8 @@ rule nextclade:
         fasta = get_fasta_for_virus,
         dataset = get_dataset_for_virus
     output:
-        nextclade_tsv = f"{parameters.output_dir}/{{virus}}.nextclade.tsv",
-        nextclade_gff = f"{parameters.output_dir}/{{virus}}.nextclade.gff"
+        nextclade_tsv = f"{parameters.output_dir}/nextclade_results/{{virus}}.nextclade.tsv",
+        nextclade_gff = f"{parameters.output_dir}/gff_files/{{virus}}.nextclade.gff"
     threads:
         parameters.threads
     log:
@@ -226,13 +224,88 @@ rule nextclade:
             {input.fasta} 2>{log}
         """
 
+checkpoint process_blast_results:
+    input:
+        blast_results = rules.blast.output.viruses_identified
+    output:
+        blast_viruses_list = f"{parameters.output_dir}/blast_results/blast_viruses.list"
+    shell:
+        """
+        cut -f 3 {input.blast_results} | sort | uniq > {output.blast_viruses_list}
+        """
+
+def get_generic_nextclade_outputs(wildcards):
+    blast_viruses_list = checkpoints.process_blast_results.get(**wildcards).output.blast_viruses_list
+    blast_viruses = []
+    if os.path.exists(blast_viruses_list):
+        with open(blast_viruses_list, 'r') as f:
+            blast_viruses = [line.strip() for line in f if line.strip()]
+    
+    return [f"{parameters.output_dir}/nextclade_results/{virus}.generic.nextclade.tsv" for virus in blast_viruses]
+
+rule run_generic_nextclade:
+    message:
+        "Run generic nextclade for blast identified virus {wildcards.virus}"
+    input:
+        sequences = parameters.sequences_fasta,
+        blast_results = rules.blast.output.viruses_identified,
+        blast_database = parameters.blast_database
+    params:
+        output_dir = parameters.output_dir,
+        datasets_dir = parameters.datasets_local_path
+    output:
+        nextclade_tsv = f"{parameters.output_dir}/nextclade_results/{{virus}}.generic.nextclade.tsv",
+        nextclade_gff = f"{parameters.output_dir}/gff_files/{{virus}}.generic.nextclade.gff"
+    threads:
+        parameters.threads
+    log:
+        "logs/generic_nextclade.{virus}.log"
+    shell:
+        """
+        # Get sequences for this virus from blast results
+        grep "{wildcards.virus}" {input.blast_results} | cut -f 1 > {params.output_dir}/blast_results/{wildcards.virus}.ids
+        seqtk subseq {input.sequences} {params.output_dir}/blast_results/{wildcards.virus}.ids > {params.output_dir}/blast_results/{wildcards.virus}.fasta
+
+        # Get reference sequence from blast db
+        echo "{wildcards.virus}" > {params.output_dir}/blast_results/{wildcards.virus}.ref.id
+        seqtk subseq {input.blast_database} {params.output_dir}/blast_results/{wildcards.virus}.ref.id > {params.output_dir}/blast_results/{wildcards.virus}.ref.fasta
+
+        # Check if GFF exists
+        GFF_FILE="{params.datasets_dir}/ncbi_gff/{wildcards.virus}.gff"
+        
+        if [ -f "$GFF_FILE" ]; then
+            echo "Valid GFF found for {wildcards.virus}. Running with annotation." >> {log}
+            nextclade run \
+                --input-ref {params.output_dir}/blast_results/{wildcards.virus}.ref.fasta \
+                --input-annotation "$GFF_FILE" \
+                --output-tsv {output.nextclade_tsv} \
+                --output-annotation-gff {output.nextclade_gff} \
+                --min-seed-cover 0.05 \
+                --jobs {threads} \
+                {params.output_dir}/blast_results/{wildcards.virus}.fasta 2>>{log}
+        else
+            echo "No GFF found for {wildcards.virus}. Running without annotation." >> {log}
+            nextclade run \
+                --input-ref {params.output_dir}/blast_results/{wildcards.virus}.ref.fasta \
+                --output-tsv {output.nextclade_tsv} \
+                --min-seed-cover 0.05 \
+                --jobs {threads} \
+                {params.output_dir}/blast_results/{wildcards.virus}.fasta 2>>{log}
+            touch {output.nextclade_gff}
+        fi
+
+        rm {params.output_dir}/blast_results/{wildcards.virus}.ids {params.output_dir}/blast_results/{wildcards.virus}.ref.id {params.output_dir}/blast_results/{wildcards.virus}.fasta {params.output_dir}/blast_results/{wildcards.virus}.ref.fasta
+        """
+
+
 rule post_process_nextclade:
     message:
         "Process nextclade outputs"
     input:
         nextclade_results = get_nextclade_outputs,
+        generic_nextclade_results = get_generic_nextclade_outputs,
         blast_results = rules.blast.output.viruses_identified,
-        unmapped_sequences = f"{parameters.output_dir}/unmapped_sequences.txt",
+        unmapped_sequences = f"{parameters.output_dir}/identified_datasets/unmapped_sequences.txt",
         config_file = parameters.config_file,
         blast_database_metadata = {parameters.blast_database_metadata}
     params:
@@ -245,6 +318,7 @@ rule post_process_nextclade:
         """
         python {PKG_PATH}/scripts/python/post_process_nextclade.py \
             --files {input.nextclade_results} \
+            --generic-files {input.generic_nextclade_results} \
             --unmapped-sequences {input.unmapped_sequences} \
             --blast-results {input.blast_results} \
             --blast-metadata {input.blast_database_metadata} \

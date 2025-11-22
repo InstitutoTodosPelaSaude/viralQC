@@ -1,3 +1,4 @@
+from viralqc import PKG_PATH
 output_dir = config["output_dir"]
 
 rule all:
@@ -17,7 +18,7 @@ rule makeblast_db:
         mkdir -p {params.output_dir}
 
         # Download viral genomes from NCBI RefSeq
-        datasets download virus genome taxon 10239 --refseq --include genome --fast-zip-validation
+        datasets download virus genome taxon 10239 --refseq --include genome,annotation --fast-zip-validation
         unzip -n ncbi_dataset.zip
         sed -e "s/ .*//g" ncbi_dataset/data/genomic.fna > {output.blast_database}
         echo -e "accession\tsegment\tvirus_name\tvirus_tax_id\tspecies_name\tspecies_tax_id\tdatabase_version" > tmp_metadata.tsv
@@ -55,7 +56,8 @@ rule makeblast_db:
         # Download ncbi taxdump files, required for taxonkit tool
         mkdir -p tmp_taxdump
         cd tmp_taxdump
-        wget -c ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz
+        rm -f taxdump.tar.gz*
+        wget ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz
         tar -zxvf taxdump.tar.gz
 
         mkdir -p $HOME/.taxonkit
@@ -73,5 +75,12 @@ rule makeblast_db:
         awk -v version="ncbi-refseq-virus_$(date +%Y-%m-%d)" 'BEGIN{{OFS="\\t"}} NR==1{{print $0; next}} {{print $0, version}}' tmp_metadata_with_species.tsv > {output.blast_metadata}
 
         makeblastdb -dbtype nucl -in {output.blast_database}
+
+        # Split GFF (Convert JSONL to GFF)
+        python {PKG_PATH}/scripts/python/jsonl_to_gff.py \
+            --input ncbi_dataset/data/annotation_report.jsonl \
+            --output-dir {params.output_dir}/ncbi_gff \
+            --fasta ncbi_dataset/data/genomic.fna
+
         rm -rf ncbi_dataset.zip ncbi_dataset/ tmp_taxdump/ tmp_metadata.tsv tmp_metadata_with_species.tsv taxid_mapping.tsv
         """
