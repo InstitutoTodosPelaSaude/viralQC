@@ -680,7 +680,7 @@ def create_unmapped_df(
                 df[col] = ""
 
     if os.path.getsize(blast_results) == 0:
-        return rdf.loc[:, ~df.columns.duplicated()]
+        return df.loc[:, ~df.columns.duplicated()]
     else:
         blast_columns = [
             "seqName",
