@@ -218,11 +218,19 @@ rule nextclade:
         """
         nextclade run \
             --input-dataset {input.dataset} \
-            --output-tsv {output.nextclade_tsv} \
+            --output-tsv {output.nextclade_tsv}.tmp \
             --output-annotation-gff {output.nextclade_gff} \
             --min-seed-cover 0.05 \
             --jobs {threads} \
             {input.fasta} 2>{log}
+
+        # Reorder cdsCoverage column based on GFF gene order
+        python {PKG_PATH}/scripts/python/reorder_cds.py \
+            --nextclade-tsv {output.nextclade_tsv}.tmp \
+            --gff {input.dataset}/genome_annotation.gff3 \
+            --output {output.nextclade_tsv}
+
+        rm {output.nextclade_tsv}.tmp
         """
 
 checkpoint process_blast_results:
@@ -241,7 +249,7 @@ def get_generic_nextclade_outputs(wildcards):
     if os.path.exists(blast_viruses_list):
         with open(blast_viruses_list, 'r') as f:
             blast_viruses = [line.strip() for line in f if line.strip()]
-    
+
     return [f"{parameters.output_dir}/nextclade_results/{virus}.generic.nextclade.tsv" for virus in blast_viruses]
 
 rule run_generic_nextclade:
@@ -279,11 +287,19 @@ rule run_generic_nextclade:
             nextclade run \
                 --input-ref {params.output_dir}/blast_results/{wildcards.virus}.ref.fasta \
                 --input-annotation "$GFF_FILE" \
-                --output-tsv {output.nextclade_tsv} \
+                --output-tsv {output.nextclade_tsv}.tmp \
                 --output-annotation-gff {output.nextclade_gff} \
                 --min-seed-cover 0.05 \
                 --jobs {threads} \
                 {params.output_dir}/blast_results/{wildcards.virus}.fasta 2>>{log}
+
+            # Reorder cdsCoverage column based on GFF gene order
+            python {PKG_PATH}/scripts/python/reorder_cds.py \
+                --nextclade-tsv {output.nextclade_tsv}.tmp \
+                --gff "$GFF_FILE" \
+                --output {output.nextclade_tsv}
+
+            rm {output.nextclade_tsv}.tmp
         else
             echo "No GFF found for {wildcards.virus}. Running without annotation." >> {log}
             nextclade run \

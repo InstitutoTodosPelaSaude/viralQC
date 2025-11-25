@@ -101,14 +101,16 @@ vqc run-from-fasta --sequences-fasta test_data/sequences.fasta
 
 Some parameters can be specified:
 
+- `--sequences-fasta` — **Required.** Path to the input FASTA file.
 - `--output-dir` — Output directory name. **Default:** `output`
-- `--output-file` - File to write final results. Valid extensions: .csv, .tsv or .json. **Default:** `results.tsv`
-- `--datasets-dir` — Path to the local Nextclade datasets directory. **Default:** `datasets`
-- `--ns-min-score` — Minimum score used by the Nextclade `sort` command. **Default:** `0.1`
-- `--ns-min-hits` — Minimum number of hits for Nextclade to consider a dataset. **Default:** `10`
-- `--blast-database` - Path to store local blast database. **Default:** `datasets/blast.fasta`
-- `--identity-threshold` - Percentual identity threshold for BLAST analysis. **Default:** `0.9`
-- `--cores` — Number of threads used in `nextclade sort` and `nextclade run`. **Default:** `1`
+- `--output-file` — File to write final results. Valid extensions: .csv, .tsv or .json. **Default:** `results.tsv`
+- `--datasets-dir` — Path to local directory containing nextclade datasets. **Default:** `datasets`
+- `--ns-min-score` — Nextclade sort min score. **Default:** `0.1`
+- `--ns-min-hits` — Nextclade sort min hits. **Default:** `10`
+- `--blast-database` — Path to local blast database. **Default:** `datasets/blast.fasta`
+- `--blast-database-metadata` — Path to local blast database metadata. **Default:** `datasets/blast.tsv`
+- `--identity-threshold` — Identity threshold for BLAST analysis. **Default:** `0.90`
+- `--cores` — Number of threads/cores to use. **Default:** `1`
 
 The output directory has the following structure:
 
@@ -201,6 +203,7 @@ This is the main analysis command. It takes a FASTA file of query sequences and 
 4.  **Nextclade Analysis:**
     *   **A. Standard Run:** For sequences mapped to a known Nextclade dataset, `nextclade run` is executed using that dataset.
     *   **B. Generic Run:** For sequences identified by BLAST (but not in the Nextclade datasets), a "generic" `nextclade run` is performed. This uses the reference sequence and GFF annotation from the BLAST database (created by `get-blast-database`).
+    *   **CDS Reordering:** For all nextclade results, the `reorder_cds.py` script is executed to reorder the CDS information in the `cdsCoverage` column. The alphabetic order from nextclade results is replaced by the order in which each CDS appears in the genome (based on start position in the GFF file). 
 5.  **Post-Processing:** The results from all `nextclade run` executions (standard and generic) and the BLAST results for any remaining unmapped sequences are combined into a single output file (`results.tsv`).
 6.  **Target Region Extraction:** Finally, specific genomic regions of interest (if defined) are extracted from the sequences based on quality criteria.
 
