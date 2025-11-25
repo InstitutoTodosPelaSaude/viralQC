@@ -113,14 +113,33 @@ Some parameters can be specified:
 The output directory has the following structure:
 
 ```
-├── <datasets>                    # Output from nextclade sort; sequences for each dataset split into sequences.fa files.
-├── datasets_selected.tsv         # Formatted nextclade sort output showing the mapping between input sequences and local datasets.
-├── <virus/dataset>.nextclade.tsv # Nextclade run output for each identified virus, including clade assignments and QC metrics.
-├── unmapped_sequences.txt        # Names of input sequences that were not mapped to any virus on nextclade sort.
-├── unmapped_sequences.blast.tsv  # BLAST results for unmapped sequences.
-├── unmapped_sequences.blast.tsv  # BLAST results for unmapped sequences.
-├── viruses.external_datasets.tsv # Nextclade sort output showing the mapping between input sequences and external (outside nextclade_data) datasets. 
-└── viruses.tsv                   # Nextclade sort output showing the mapping between input sequences and remote (nextclade_data) datasets.
+output/
+├── identified_datasets/              # Outputs from nextclade sort
+│   ├── datasets_selected.tsv         # Formatted nextclade sort output showing the mapping between input sequences and local datasets
+│   ├── viruses.tsv                   # Nextclade sort output showing the mapping between input sequences and remote (nextclade_data) datasets
+│   ├── viruses.external_datasets.tsv # Nextclade sort output showing the mapping between input sequences and external (outside nextclade_data) datasets
+│   ├── unmapped_sequences.txt        # Names of input sequences that were not mapped to any virus on nextclade sort
+│   └── <virus/dataset>/              # Sequences for each dataset split into sequences.fa files
+│       └── sequences.fa
+├── blast_results/                    # BLAST analysis results
+│   ├── unmapped_sequences.blast.tsv  # BLAST results for unmapped sequences
+│   └── blast_viruses.list            # List of unique virus accessions identified by BLAST
+├── nextclade_results/                # Nextclade run outputs
+│   ├── <virus>.nextclade.tsv         # Standard nextclade run output for each identified virus
+│   └── <accession>.generic.nextclade.tsv # Generic nextclade run output for BLAST-identified viruses
+├── gff_files/                        # GFF annotation files
+│   ├── <virus>.nextclade.gff         # GFF files from standard nextclade runs
+│   └── <accession>.generic.nextclade.gff # GFF files from generic nextclade runs
+├── logs/                             # Log files for all pipeline steps
+│   ├── nextclade_sort.log
+│   ├── blast.log
+│   ├── nextclade.<virus>.log
+│   ├── generic_nextclade.<virus>.log
+│   ├── pp_nextclade.log
+│   └── extract_target_regions.log
+├── results(.tsv,.csv,.json)                       # Final combined results (format: .tsv, .csv, or .json)
+├── sequences_target_regions.bed      # BED file with target regions (includes 4 columns: seqname, start, end, region_name)
+└── sequences_target_regions.fasta    # FASTA file with extracted target region sequences
 ```
 
 ## Usage (API)

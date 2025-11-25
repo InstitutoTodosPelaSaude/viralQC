@@ -16,11 +16,13 @@ rule makeblast_db:
     shell:
         """
         mkdir -p {params.output_dir}
+        mkdir -p {params.output_dir}/tmp_ncbi
 
         # Download viral genomes from NCBI RefSeq
+        cd {params.output_dir}/tmp_ncbi
         datasets download virus genome taxon 10239 --refseq --include genome,annotation --fast-zip-validation
         unzip -n ncbi_dataset.zip
-        sed -e "s/ .*//g" ncbi_dataset/data/genomic.fna > {output.blast_database}
+        sed -e "s/ .*//g" ncbi_dataset/data/genomic.fna > ../blast.fasta
         echo -e "accession\tsegment\tvirus_name\tvirus_tax_id\tspecies_name\tspecies_tax_id\tdatabase_version" > tmp_metadata.tsv
         dataformat tsv virus-genome \
             --inputfile ncbi_dataset/data/data_report.jsonl \
@@ -72,15 +74,17 @@ rule makeblast_db:
         join_files tmp_metadata.tsv taxid_mapping.tsv > tmp_metadata_with_species.tsv
 
         # Add database version
-        awk -v version="ncbi-refseq-virus_$(date +%Y-%m-%d)" 'BEGIN{{OFS="\\t"}} NR==1{{print $0; next}} {{print $0, version}}' tmp_metadata_with_species.tsv > {output.blast_metadata}
+        awk -v version="ncbi-refseq-virus_$(date +%Y-%m-%d)" 'BEGIN{{OFS="\\t"}} NR==1{{print $0; next}} {{print $0, version}}' tmp_metadata_with_species.tsv > ../blast.tsv
 
-        makeblastdb -dbtype nucl -in {output.blast_database}
+        makeblastdb -dbtype nucl -in ../blast.fasta
 
         # Split GFF (Convert JSONL to GFF)
         python {PKG_PATH}/scripts/python/jsonl_to_gff.py \
             --input ncbi_dataset/data/annotation_report.jsonl \
-            --output-dir {params.output_dir}/ncbi_gff \
+            --output-dir ../blast_gff \
             --fasta ncbi_dataset/data/genomic.fna
 
-        rm -rf ncbi_dataset.zip ncbi_dataset/ tmp_taxdump/ tmp_metadata.tsv tmp_metadata_with_species.tsv taxid_mapping.tsv
+        # Clean up temporary directory
+        cd ../..
+        rm -rf {params.output_dir}/tmp_ncbi
         """

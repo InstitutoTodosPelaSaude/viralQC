@@ -75,10 +75,11 @@ rule nextclade_sort:
     threads:
         parameters.threads
     log:
-        "logs/nextclade_sort.log"
+        f"{parameters.output_dir}/logs/nextclade_sort.log"
     shell:
         """
         mkdir -p {params.output_dir}/identified_datasets
+        mkdir -p {params.output_dir}/logs
 
         nextclade sort {input.sequences} \
             --output-path '{params.output_dir}/identified_datasets/{{name}}/sequences.fa' \
@@ -153,7 +154,7 @@ rule blast:
     threads:
         parameters.threads
     log:
-        "logs/blast.log"
+        f"{parameters.output_dir}/logs/blast.log"
     shell:
         """
         mkdir -p {params.output_dir}/blast_results
@@ -212,7 +213,7 @@ rule nextclade:
     threads:
         parameters.threads
     log:
-        "logs/nextclade.{virus}.log"
+        f"{parameters.output_dir}/logs/nextclade.{{virus}}.log"
     shell:
         """
         nextclade run \
@@ -259,7 +260,7 @@ rule run_generic_nextclade:
     threads:
         parameters.threads
     log:
-        "logs/generic_nextclade.{virus}.log"
+        f"{parameters.output_dir}/logs/generic_nextclade.{{virus}}.log"
     shell:
         """
         # Get sequences for this virus from blast results
@@ -271,7 +272,7 @@ rule run_generic_nextclade:
         seqtk subseq {input.blast_database} {params.output_dir}/blast_results/{wildcards.virus}.ref.id > {params.output_dir}/blast_results/{wildcards.virus}.ref.fasta
 
         # Check if GFF exists
-        GFF_FILE="{params.datasets_dir}/ncbi_gff/{wildcards.virus}.gff"
+        GFF_FILE="{params.datasets_dir}/blast_gff/{wildcards.virus}.gff"
         
         if [ -f "$GFF_FILE" ]; then
             echo "Valid GFF found for {wildcards.virus}. Running with annotation." >> {log}
@@ -313,7 +314,7 @@ rule post_process_nextclade:
     output:
         output_file = f"{parameters.output_dir}/{parameters.output_file}"
     log:
-        "logs/pp_nextclade.log"
+        f"{parameters.output_dir}/logs/pp_nextclade.log"
     shell:
         """
         python {PKG_PATH}/scripts/python/post_process_nextclade.py \
@@ -341,7 +342,7 @@ rule extract_target_regions:
     threads:
         parameters.threads
     log:
-        "logs/extract_target_regions.log"
+        f"{parameters.output_dir}/logs/extract_target_regions.log"
     shell:
         """
         python {PKG_PATH}/scripts/python/extract_target_regions.py \
