@@ -716,6 +716,8 @@ def create_unmapped_df(
             ]
         ]
 
+        df["seqName"] = df["seqName"].astype(str)
+        blast_df["seqName"] = blast_df["seqName"].astype(str)
         merged = df.merge(blast_df, on="seqName", how="left", suffixes=("_df1", "_df2"))
         merged["virus"] = merged["virus_df2"].fillna(merged["virus_df1"])
 
