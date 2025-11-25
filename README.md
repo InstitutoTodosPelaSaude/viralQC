@@ -146,17 +146,19 @@ black viralqc
 
 This command is responsible for downloading and configuring the Nextclade datasets required for analysis. It reads a configuration file (`config/datasets.yml`) to determine which datasets to fetch.
 
+![get-nextclade-datasets](assets/get_nextclade_datasets.svg)
+
 **Logic:**
 1.  **Read Configuration:** The command reads the `config/datasets.yml` file to identify the list of viruses and their corresponding Nextclade dataset names or GitHub repositories.
 2.  **Download Nextclade Datasets:** For viruses hosted on Nextclade's official repository, it uses the `nextclade dataset get` command to download the reference sequence, gene map, and other necessary files.
 3.  **Download GitHub Datasets:** For viruses hosted on GitHub, it uses a custom Python script (`get_github_dataset.py`) to download the dataset files.
 4.  **Generate Minimizer Index:** For the GitHub datasets, it generates a minimizer index (`external_datasets_minimizers.json`) using `get_minimizer_index.py`. This index is crucial for the `nextclade sort` step to recognize these external datasets.
 
-![get-nextclade-datasets](assets/get_nextclade_datasets.svg)
-
 ### get-blast-database
 
 This command builds a local BLAST database containing all viral genomes from NCBI RefSeq. This database is used to identify sequences that are not recognized by Nextclade's default datasets.
+
+![get-blast-database](assets/get_blast_database.svg)
 
 **Logic:**
 1.  **Download Genomes:** It downloads all viral genomes from NCBI RefSeq using the `datasets` CLI tool.
@@ -165,11 +167,11 @@ This command builds a local BLAST database containing all viral genomes from NCB
 4.  **Create BLAST DB:** It uses `makeblastdb` to create the searchable BLAST database.
 5.  **Generate GFFs:** It converts the JSONL annotation reports from NCBI into GFF3 format using `jsonl_to_gff.py`. **Crucially**, this step filters out accessions where the CDS length is not divisible by 3 or other structural anomalies, ensuring that only valid annotations are used for generic Nextclade runs.
 
-![get-blast-database](assets/get_blast_database.svg)
-
 ### run-from-fasta
 
 This is the main analysis command. It takes a FASTA file of query sequences and performs virus identification, clade assignment, and quality control.
+
+![run-from-fasta](assets/run_from_fasta.svg)
 
 **Logic:**
 1.  **Nextclade Sort:** The input sequences are first passed to `nextclade sort`. This tool compares the sequences against the local Nextclade datasets (including the external ones via the minimizer index) to identify which virus each sequence belongs to.
@@ -183,4 +185,3 @@ This is the main analysis command. It takes a FASTA file of query sequences and 
 5.  **Post-Processing:** The results from all `nextclade run` executions (standard and generic) and the BLAST results for any remaining unmapped sequences are combined into a single output file (`results.tsv`).
 6.  **Target Region Extraction:** Finally, specific genomic regions of interest (if defined) are extracted from the sequences based on quality criteria.
 
-![run-from-fasta](assets/run_from_fasta.svg)
