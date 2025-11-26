@@ -230,16 +230,18 @@ def get_genome_quality(scores: list[str]) -> tuple[int, str]:
     return normalized_total, "D"
 
 
-def _parse_cds_cov(cds_list: str) -> list[dict[str, float]]:
+def _parse_cds_cov(cds_list: str | dict) -> dict[str, float]:
     """
     Parse the cdsCoverage string into a dictionary.
 
     Args:
-        cds_list: String containing CDS coverage data.
+        cds_list: String or dict containing CDS coverage data.
 
     Returns:
         Dictionary mapping gene names to coverage values.
     """
+    if isinstance(cds_list, dict):
+        return cds_list
     if not isinstance(cds_list, str):
         return {}
     parts = cds_list.split(",")
@@ -248,23 +250,23 @@ def _parse_cds_cov(cds_list: str) -> list[dict[str, float]]:
         if ":" in p:
             cds, cov = p.split(":")
             try:
-                result[cds] = round(float(cov), 4)
+                result[cds.strip()] = round(float(cov), 4)
             except ValueError:
                 continue
     return result
 
 
 def get_cds_cov_quality(
-    cds_coverage: str,
+    cds_coverage: str | dict,
     target_threshold_a: float,
     target_threshold_b: float,
     target_threshold_c: float,
-) -> list[dict[str, str]]:
+) -> str:
     """
     Categorize the cds regions based on coverage thresholds.
 
     Args:
-        cds_coverage: Value of the 'cdsCoverage' column from the Nextclade output.
+        cds_coverage: Value of the 'cdsCoverage' column from the Nextclade output (str or dict).
         target_threshold_a: Minimum required coverage for consider a target regions as "A".
         target_threshold_b: Minimum required coverage for consider a target regions as "B".
         target_threshold_c: Minimum required coverage for consider a target regions as "C".
@@ -272,32 +274,33 @@ def get_cds_cov_quality(
     Returns:
         The status of the target regions.
     """
-    if not isinstance(cds_coverage, str):
+    # Convert to dict if string
+    if isinstance(cds_coverage, str):
+        cds_coverage = _parse_cds_cov(cds_coverage)
+
+    if not isinstance(cds_coverage, dict):
         return ""
 
-    parts = cds_coverage.split(",")
     result = {}
-    for p in parts:
-        if ":" in p:
-            cds, cov = p.split(":")
-            try:
-                cov_val = float(cov)
-                if cov_val >= target_threshold_a:
-                    result[cds] = "A"
-                elif cov_val >= target_threshold_b:
-                    result[cds] = "B"
-                elif cov_val >= target_threshold_c:
-                    result[cds] = "C"
-                elif cov_val > 0:
-                    result[cds] = "D"
-            except ValueError:
-                continue
+    for cds, cov in cds_coverage.items():
+        try:
+            cov_val = float(cov)
+            if cov_val >= target_threshold_a:
+                result[cds] = "A"
+            elif cov_val >= target_threshold_b:
+                result[cds] = "B"
+            elif cov_val >= target_threshold_c:
+                result[cds] = "C"
+            elif cov_val > 0:
+                result[cds] = "D"
+        except (ValueError, TypeError):
+            continue
 
     return ", ".join(f"{cds}: {coverage}" for cds, coverage in result.items())
 
 
 def get_target_regions_quality(
-    cds_coverage: str,
+    cds_coverage: str | dict,
     genome_quality: str,
     target_regions: list,
     target_threshold_a: float,
@@ -309,7 +312,7 @@ def get_target_regions_quality(
     on coverage thresholds.
 
     Args:
-        cds_coverage: Value of the 'cdsCoverage' column from the Nextclade output.
+        cds_coverage: Value of the 'cdsCoverage' column from the Nextclade output (str or dict).
         genome_quality: Quality of genome.
         target_regions: List of target regions.
         target_threshold_a: Minimum required coverage for consider a target regions as "A".
@@ -325,7 +328,12 @@ def get_target_regions_quality(
     if not target_regions:
         return ""
 
-    cds_coverage = _parse_cds_cov(cds_coverage)
+    # Convert to dict if string
+    if isinstance(cds_coverage, str):
+        cds_coverage = _parse_cds_cov(cds_coverage)
+    elif not isinstance(cds_coverage, dict):
+        cds_coverage = {}
+
     cds_coverage = {k.strip(): v for k, v in cds_coverage.items()}
     coverages = []
     for region in target_regions:
@@ -345,18 +353,25 @@ def get_target_regions_quality(
     return "D"
 
 
-def get_target_regions_coverage(cds_coverage: str, target_regions: list[str]) -> str:
+def get_target_regions_coverage(
+    cds_coverage: str | dict, target_regions: list[str]
+) -> str:
     """
     Extract the coverage of specific genomic regions.
 
     Args:
-        cds_coverage: Value of the 'cdsCoverage' column from the Nextclade output.
+        cds_coverage: Value of the 'cdsCoverage' column from the Nextclade output (str or dict).
         target_regions: List of target regions.
 
     Returns:
         A string with region and coverage.
     """
-    cds_coverage = _parse_cds_cov(cds_coverage)
+    # Convert to dict if string
+    if isinstance(cds_coverage, str):
+        cds_coverage = _parse_cds_cov(cds_coverage)
+    elif not isinstance(cds_coverage, dict):
+        cds_coverage = {}
+
     target_cds_coverage = [
         f"{region}: {cds_coverage.get(region,0)}" for region in target_regions
     ]
@@ -396,6 +411,7 @@ def add_coverages(df: DataFrame, virus_info: dict) -> DataFrame:
         )
     )
 
+    # Format cdsCoverage as string (will be converted to array for JSON output later)
     df["cdsCoverage"] = df["cdsCoverage"].apply(_parse_cds_cov)
     df["cdsCoverage"] = df["cdsCoverage"].apply(
         lambda d: ", ".join(f"{cds}: {coverage}" for cds, coverage in d.items())
@@ -779,17 +795,73 @@ def write_combined_df(
     # (empty string for CSV/TSV, null for JSON)
     final_df = final_df.replace(r"^\s*$", nan, regex=True)
 
-    if output_format == "tsv":
-        final_df.to_csv(output_file, sep="\t", index=False, header=True)
-    if output_format == "csv":
-        final_df.to_csv(
-            output_file, sep=";", index=False, header=True, quoting=csv.QUOTE_NONNUMERIC
-        )
     if output_format == "json":
+        # For JSON output, format specific columns as arrays instead of strings
+        coverage_cols = ["cdsCoverageQuality", "cdsCoverage", "targetRegionsCoverage"]
+        mutation_cols = [
+            "substitutions",
+            "deletions",
+            "insertions",
+            "frameShifts",
+            "aaSubstitutions",
+            "aaDeletions",
+            "aaInsertions",
+        ]
+
+        for col in coverage_cols:
+            if col in final_df.columns:
+                if col == "cdsCoverage":
+                    final_df[col] = final_df[col].apply(
+                        lambda val: (
+                            [{k: v} for k, v in _parse_cds_cov(val).items()]
+                            if isinstance(val, str) and val.strip()
+                            else None
+                        )
+                    )
+                else:
+
+                    def parse_coverage_to_dicts(val):
+                        if not isinstance(val, str) or not val.strip():
+                            return None
+                        result = []
+                        for item in val.split(","):
+                            item = item.strip()
+                            if ":" in item:
+                                parts = item.split(":", 1)
+                                region = parts[0].strip()
+                                try:
+                                    value = float(parts[1].strip())
+                                    result.append({region: value})
+                                except ValueError:
+                                    value = parts[1].strip()
+                                    result.append({region: value})
+                        return result if result else None
+
+                    final_df[col] = final_df[col].apply(parse_coverage_to_dicts)
+
+        for col in mutation_cols:
+            if col in final_df.columns:
+                final_df[col] = final_df[col].apply(
+                    lambda val: (
+                        val.split(",") if isinstance(val, str) and val.strip() else None
+                    )
+                )
+
         json_content = final_df.to_json(orient="table", indent=4)
         json_content = json_content.replace("\\/", "/")
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(json_content)
+    else:
+        if output_format == "tsv":
+            final_df.to_csv(output_file, sep="\t", index=False, header=True)
+        if output_format == "csv":
+            final_df.to_csv(
+                output_file,
+                sep=";",
+                index=False,
+                header=True,
+                quoting=csv.QUOTE_NONNUMERIC,
+            )
 
 
 if __name__ == "__main__":

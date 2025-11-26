@@ -109,7 +109,9 @@ Some parameters can be specified:
 - `--ns-min-hits` — Nextclade sort min hits. **Default:** `10`
 - `--blast-database` — Path to local blast database. **Default:** `datasets/blast.fasta`
 - `--blast-database-metadata` — Path to local blast database metadata. **Default:** `datasets/blast.tsv`
-- `--identity-threshold` — Identity threshold for BLAST analysis. **Default:** `0.90`
+- `--blast-pident` — Identity threshold for BLAST analysis (percentage). **Default:** `80`
+- `--blast-evalue` — E-value threshold for BLAST analysis. **Default:** `1e-10`
+- `--blast-qcov` — Minimum query coverage per HSP for BLAST analysis (percentage). **Default:** `80`
 - `--cores` — Number of threads/cores to use. **Default:** `1`
 
 The output directory has the following structure:
@@ -199,7 +201,7 @@ This is the main analysis command. It takes a FASTA file of query sequences and 
 2.  **Datasets Identification:**: Identify the virus/dataset that each sequence belongs to with format_nextclade_sort.py
     *   **Mapped Sequences:** Sequences that match a known dataset are assigned to that virus.
     *   **Unmapped Sequences:** Sequences that do not match any dataset are flagged as "unmapped".
-3.  **BLAST Analysis:** The unmapped sequences are queried against the local BLAST database (`blastn`) to identify their closest viral match.
+3.  **BLAST Analysis:** The unmapped sequences are queried against the local BLAST database (`blastn`) to identify their closest viral match. Here the parameters `--blast-pident`, `--blast-evalue` and `--blast-qcov` can be specified to control the BLAST sensitivity, the default values are `80`, `1e-10` and `80` respectively which are not indicated for metagenomic analysis of unknown viruses.
 4.  **Nextclade Analysis:**
     *   **A. Standard Run:** For sequences mapped to a known Nextclade dataset, `nextclade run` is executed using that dataset.
     *   **B. Generic Run:** For sequences identified by BLAST (but not in the Nextclade datasets), a "generic" `nextclade run` is performed. This uses the reference sequence and GFF annotation from the BLAST database (created by `get-blast-database`).

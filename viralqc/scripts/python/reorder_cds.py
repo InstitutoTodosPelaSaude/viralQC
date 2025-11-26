@@ -27,7 +27,7 @@ def read_gff_gene_order(gff_file: Path) -> list[str]:
                         gene_name = attr.split("gene_name=")[1].strip()
                         genes.append((start_pos, gene_name))
                         break
-    
+
     # Sort by start position and extract gene names
     genes.sort(key=lambda x: x[0])
     return [gene_name for _, gene_name in genes]
