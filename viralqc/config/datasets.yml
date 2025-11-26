@@ -411,7 +411,7 @@ nextclade_data:
     ncbi_id: "CY115158.1"
     target_gene: "PB2"
     target_regions: ["PB2"]
-  chivk:
+  chikv:
     dataset: "community/v-gen-lab/chikV/genotypes"
     tag: "2025-09-24--07-29-03Z"
     virus_name: "Chikungunya virus"

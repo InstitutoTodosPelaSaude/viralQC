@@ -78,12 +78,6 @@ def get_nextclade_datasets(
 
 
 @app.command()
-def get_custom_datasets(cores: int = 1):
-    """Get custom virus datasets"""
-    print("In progress")
-
-
-@app.command()
 def get_blast_database(
     output_dir: str = typer.Option(
         "datasets",
@@ -150,10 +144,20 @@ def run_from_fasta(
         "--blast-database-metadata",
         help="Path to local blast database metadata.",
     ),
-    identity_threshold: str = typer.Option(
-        0.90,
-        "--identity-threshold",
+    blast_pident: int = typer.Option(
+        80,
+        "--blast-pident",
         help="Identity threshold for BLAST analysis.",
+    ),
+    blast_evalue: float = typer.Option(
+        0.0000000001,
+        "--blast-evalue",
+        help="E-value threshold for BLAST analysis.",
+    ),
+    blast_qcov: int = typer.Option(
+        80,
+        "--blast-qcov",
+        help="Minimum query coverage per HSP for BLAST analysis.",
     ),
     config_file_path: Optional[str] = DATASETS_CONFIG_PATH,
     snk_file_path: Optional[str] = RUN_NEXTCLADE_SNK_PATH,
@@ -172,7 +176,9 @@ def run_from_fasta(
         nextclade_sort_min_hits=nextclade_sort_min_hits,
         blast_database=blast_database,
         blast_database_metadata=blast_database_metadata,
-        blast_identity_threshold=identity_threshold,
+        blast_identity_threshold=blast_pident,
+        blast_evalue=blast_evalue,
+        blast_qcov=blast_qcov,
     )
     if snakemake_response.status == 200:
         log_multiline(snakemake_response.format_log())

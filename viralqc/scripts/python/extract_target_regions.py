@@ -89,11 +89,11 @@ def check_target_regions(pp_results: DataFrame) -> dict:
     """
     sequence_and_region = {}
     for _, row in pp_results.iterrows():
-        if row["genomeQuality"] == "good":
+        if row["genomeQuality"] in ["A", "B"]:
             sequence_and_region[row["seqName"]] = "genome"
-        elif row["targetRegionsQuality"] == "good":
+        elif row["targetRegionsQuality"] in ["A", "B"]:
             sequence_and_region[row["seqName"]] = row["targetRegions"]
-        elif row["targetGeneQuality"] == "good":
+        elif row["targetGeneQuality"] in ["A", "B"]:
             sequence_and_region[row["seqName"]] = row["targetGene"]
     return sequence_and_region
 
@@ -113,8 +113,8 @@ def get_regions(target_regions: dict, gff_info: DataFrame) -> dict:
         target_regions: A dictionary with sequence name as key, and target regions as values.
         gff_info: A dataframe that represents the GFF file.
     Returns:
-        A dictionary with sequence names as keys and a set containing the start and end positions
-        of target regions.
+        A dictionary with sequence names as keys and a tuple containing the start and end positions
+        of target regions and the region name.
     """
     sequences_intervals = {}
     seq_to_gff = {seq: df for seq, df in gff_info.groupby("seqname")}
@@ -129,9 +129,10 @@ def get_regions(target_regions: dict, gff_info: DataFrame) -> dict:
                 sequences_intervals[seq] = (
                     region_rows["start"].values[0] - 1,
                     region_rows["end"].values[0],
+                    "genome",
                 )
         else:
-            genes = region.split("-")
+            genes = region.split("|")
             gene_rows = df_seq[df_seq["feature"] == "gene"]
             mask = gene_rows["attribute"].str.contains(
                 "|".join(f"gene_name={g}" for g in genes)
@@ -139,25 +140,28 @@ def get_regions(target_regions: dict, gff_info: DataFrame) -> dict:
             gene_rows = gene_rows[mask]
 
             if not gene_rows.empty:
+                # Convert genes list to comma-separated string
+                region_name = ",".join(genes)
                 sequences_intervals[seq] = (
                     gene_rows["start"].min() - 1,
                     gene_rows["end"].max(),
+                    region_name,
                 )
     return sequences_intervals
 
 
 def write_bed(sequences_intervals: dict, output_file: Path) -> None:
     """
-    Writes the target regions intervals to a bed file.
+    Writes the target regions intervals to a bed file with region names.
 
     Args:
-        sequences_intervals: A dictionary with sequence names as keys and a set
-        containing the start and end positions of target regions.
+        sequences_intervals: A dictionary with sequence names as keys and a tuple
+        containing the start and end positions and region name of target regions.
         output_file: Output file path.
     """
     with output_file.open("w") as f:
-        for seqname, (start, end) in sequences_intervals.items():
-            f.write(f"{seqname}\t{int(start)}\t{int(end)}\n")
+        for seqname, (start, end, region_name) in sequences_intervals.items():
+            f.write(f"{seqname}\t{int(start)}\t{int(end)}\t{region_name}\n")
 
 
 if __name__ == "__main__":
@@ -185,7 +189,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    files = glob(f"{args.pp_results.parent}/*.gff")
+    files = glob(f"{args.pp_results.parent}/gff_files/*.gff")
     gff = read_gffs(files)
     pp_nextclade = read_pp_nextclade(args.pp_results, args.output_format)
     target_regions = check_target_regions(pp_nextclade)
