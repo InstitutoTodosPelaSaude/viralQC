@@ -50,7 +50,7 @@ micromamba activate viralQC
 #### viralQC
 
 ```bash
-pip install .
+pip install -e .
 ```
 
 ### Check installation (CLI)
