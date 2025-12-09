@@ -77,6 +77,24 @@ def get_nextclade_datasets(
         logger.error("Failed to retrieve Nextclade public datasets.")
 
 
+def validate_date_format(value: Optional[str]) -> Optional[str]:
+    """Validate that the date is in YYYY-MM-DD format."""
+    if value is None:
+        return None
+    import re
+    from datetime import datetime
+
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", value):
+        raise typer.BadParameter("Date must be in YYYY-MM-DD format.")
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        raise typer.BadParameter(
+            "Invalid date. Please use a valid date in YYYY-MM-DD format."
+        )
+    return value
+
+
 @app.command()
 def get_blast_database(
     output_dir: str = typer.Option(
@@ -84,12 +102,19 @@ def get_blast_database(
         "--output-dir",
         help="Path to store BLAST database.",
     ),
+    release_date: Optional[str] = typer.Option(
+        None,
+        "--release-date",
+        help="Filter sequences by release date (YYYY-MM-DD). Only sequences released on or before this date will be included.",
+        callback=validate_date_format,
+    ),
     snk_file_path: Optional[str] = GET_BLAST_DB_SNK_PATH,
     cores: int = 1,
 ):
     """Create BLAST database based on ncbi viruses refseq genomes"""
     snakemake_response = get_blast_db.get_database(
         output_dir=output_dir,
+        release_date=release_date,
         snk_file=snk_file_path,
         cores=cores,
     )

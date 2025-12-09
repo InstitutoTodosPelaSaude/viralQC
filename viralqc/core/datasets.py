@@ -25,10 +25,14 @@ class GetBlastDatabase:
     def get_database(
         self,
         output_dir: str,
+        release_date: str | None,
         snk_file: str,
         cores: int,
     ) -> SnakemakeResponse:
-        config = {"output_dir": output_dir}
+        config = {
+            "output_dir": output_dir,
+            "release_date": release_date,
+        }
 
         snakemake_response = run_snakemake(snk_file, None, cores, config)
         return snakemake_response

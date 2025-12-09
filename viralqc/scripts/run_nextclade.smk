@@ -8,21 +8,21 @@ logging.basicConfig(level=logging.WARNING, format='%(levelname)s:%(message)s')
 rule parameters:
     params:
         sequences_fasta = config["sequences_fasta"],
-        output_dir = config["output_dir"],
-        output_file = config["output_file"],
-        output_format = config["output_format"],
+        output_dir = config.get("output_dir", "output"),
+        output_file = config.get("output_file", "results.tsv"),
+        output_format = config.get("output_format", "tsv"),
         config_file = config["config_file"],
-        datasets_local_path = config["datasets_local_path"],
-        external_datasets_minimizers = f"{config['datasets_local_path']}/external_datasets_minimizers.json",
-        nextclade_sort_min_score = config["nextclade_sort_min_score"],
-        nextclade_sort_min_hits = config["nextclade_sort_min_hits"],
-        blast_database = config["blast_database"],
-        blast_database_metadata = config["blast_database_metadata"],
-        blast_identity_threshold = config["blast_identity_threshold"],
-        blast_evalue = config["blast_evalue"],
-        blast_qcov = config["blast_qcov"],
-        blast_task = config["blast_task"],
-        threads = config["threads"]
+        datasets_local_path = config.get("datasets_local_path", "datasets"),
+        external_datasets_minimizers = f"{config.get('datasets_local_path', 'datasets')}/external_datasets_minimizers.json",
+        nextclade_sort_min_score = config.get("nextclade_sort_min_score", 0.1),
+        nextclade_sort_min_hits = config.get("nextclade_sort_min_hits", 10),
+        blast_database = config.get("blast_database", "datasets/blast.fasta"),
+        blast_database_metadata = config.get("blast_database_metadata", "datasets/blast.tsv"),
+        blast_identity_threshold = config.get("blast_identity_threshold", 80),
+        blast_evalue = config.get("blast_evalue", 0.0000000001),
+        blast_qcov = config.get("blast_qcov", 80),
+        blast_task = config.get("blast_task", "megablast"),
+        threads = config.get("threads", 1)
 
 parameters = rules.parameters.params
 
