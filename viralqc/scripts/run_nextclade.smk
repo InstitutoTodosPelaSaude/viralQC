@@ -21,6 +21,7 @@ rule parameters:
         blast_identity_threshold = config["blast_identity_threshold"],
         blast_evalue = config["blast_evalue"],
         blast_qcov = config["blast_qcov"],
+        blast_task = config["blast_task"],
         threads = config["threads"]
 
 parameters = rules.parameters.params
@@ -152,6 +153,7 @@ rule blast:
         identity_threshold = parameters.blast_identity_threshold,
         blast_evalue = parameters.blast_evalue,
         blast_qcov = parameters.blast_qcov,
+        blast_task = parameters.blast_task,
         output_dir = parameters.output_dir
     output:
         viruses_identified = f"{parameters.output_dir}/blast_results/unmapped_sequences.blast.tsv",
@@ -167,7 +169,7 @@ rule blast:
             blastn -db {input.blast_database} \
                 -query {params.output_dir}/blast_results/unmapped_sequences.fasta \
                 -out {output.viruses_identified} \
-                -task megablast \
+                -task {params.blast_task} \
                 -evalue {params.blast_evalue} \
                 -qcov_hsp_perc {params.blast_qcov} \
                 -outfmt "6 qseqid qlen sseqid slen qstart qend sstart send evalue bitscore pident qcovs qcovhsp" \

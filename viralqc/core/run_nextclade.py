@@ -29,6 +29,7 @@ class RunNextclade:
         blast_identity_threshold: float,
         blast_evalue: float,
         blast_qcov: float,
+        blast_task: str,
     ) -> SnakemakeResponse:
         output_format = self._get_output_format(output_file)
         config = {
@@ -46,6 +47,7 @@ class RunNextclade:
             "blast_identity_threshold": blast_identity_threshold,
             "blast_evalue": blast_evalue,
             "blast_qcov": blast_qcov,
+            "blast_task": blast_task,
         }
 
         snakemake_response = run_snakemake(snk_file, [config_file], cores, config)

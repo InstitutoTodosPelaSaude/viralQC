@@ -106,6 +106,13 @@ class SortChoices(str, Enum):
     blast = "blast"
 
 
+class BlastTaskChoices(str, Enum):
+    megablast = "megablast"
+    dc_megablast = "dc-megablast"
+    blastn = "blastn"
+    blastn_short = "blastn-short"
+
+
 @app.command()
 def run_from_fasta(
     sequences_fasta: str = typer.Option(
@@ -159,6 +166,11 @@ def run_from_fasta(
         "--blast-qcov",
         help="Minimum query coverage per HSP for BLAST analysis.",
     ),
+    blast_task: BlastTaskChoices = typer.Option(
+        BlastTaskChoices.megablast,
+        "--blast-task",
+        help="BLAST task type (megablast, dc-megablast, blastn, blastn-short).",
+    ),
     config_file_path: Optional[str] = DATASETS_CONFIG_PATH,
     snk_file_path: Optional[str] = RUN_NEXTCLADE_SNK_PATH,
     cores: int = 1,
@@ -179,6 +191,7 @@ def run_from_fasta(
         blast_identity_threshold=blast_pident,
         blast_evalue=blast_evalue,
         blast_qcov=blast_qcov,
+        blast_task=blast_task.value,
     )
     if snakemake_response.status == 200:
         log_multiline(snakemake_response.format_log())
