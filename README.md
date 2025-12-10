@@ -100,7 +100,7 @@ This command runs several steps to identify viruses represented in the input FAS
 #### run
 
 ```bash
-vqc run --sequences-fasta test_data/sequences.fasta
+vqc run --input test_data/sequences.fasta
 ```
 
 Some parameters can be specified:
