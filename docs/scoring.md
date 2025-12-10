@@ -6,10 +6,10 @@ ViralQC implements its **own quality scoring system** that is more flexible than
 
 While Nextclade uses three categories (good, mediocre, bad) based on fixed scores, ViralQC offers **four levels** (A, B, C, D):
 
-- **A** - Perfect: Sequences meeting all quality criteria
-- **B** - Good: Sequences suitable for most analyses
-- **C** - Acceptable: Use with caution
-- **D** - Poor: Use not recommended
+- **A** - Sequences meeting all quality criteria
+- **B** - Sequences suitable for most analyses
+- **C** - Use with caution
+- **D** - Use not recommended
 
 ## Quality Metrics
 

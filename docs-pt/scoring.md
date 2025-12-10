@@ -6,10 +6,10 @@ O ViralQC implementa um **sistema próprio de pontuação** mais flexível que o
 
 Enquanto o Nextclade usa três categorias (good, mediocre, bad), o ViralQC oferece **quatro níveis** (A, B, C, D):
 
-- **A** - Perfeito: Sequências que atendem todos os critérios
-- **B** - Bom: Sequências adequadas para maioria das análises
-- **C** - Aceitável: Usar com cautela
-- **D** - Ruim: Uso não recomendado
+- **A** - Sequências que atendem todos os critérios
+- **B** - Sequências adequadas para maioria das análises
+- **C** - Usar com cautela
+- **D** - Uso não recomendado
 
 ## Métricas de Qualidade
 

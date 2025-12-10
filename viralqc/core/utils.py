@@ -1,8 +1,29 @@
-import io, contextlib, re
-from typing import Tuple, Optional, List
+import io, contextlib, re, sys
+from typing import Tuple, Optional
+from pathlib import Path
 from snakemake import snakemake
-from viralqc.core.errors import SnakemakeExecutionFailed
 from viralqc.core.models import SnakemakeResponse, RunStatus
+
+
+class Tee(object):
+    """
+    Redirects output to multiple files, the flush method is called for each file
+    in order to ensure that the output is written to all files and that the
+    output is not buffered, so in the context of this code the content is directly
+    written to the log files and printed to the console (if verbose=True).
+    """
+
+    def __init__(self, *files):
+        self.files = files
+
+    def write(self, obj):
+        for f in self.files:
+            f.write(obj)
+            f.flush()
+
+    def flush(self):
+        for f in self.files:
+            f.flush()
 
 
 def _get_log_and_run_id_from_log(log_lines: str) -> Tuple[str, Optional[str]]:
@@ -18,9 +39,10 @@ def _get_log_and_run_id_from_log(log_lines: str) -> Tuple[str, Optional[str]]:
 
 def run_snakemake(
     snk_file: str,
-    config_file: Optional[List[str]] = None,
+    config_file: Path | None = None,
     cores: int = 1,
     config: dict = None,
+    verbose: bool = False,
 ) -> SnakemakeResponse:
     """
     The snakemake module has runtime logic that must be handled with viralQA
@@ -32,11 +54,17 @@ def run_snakemake(
 
     Keyword arguments:
         snk_file -- .snk snakemake file path
-        config_file -- .yml or .json snakemake config file path
+        config_file -- .yaml config file path
         cores -- number of cores used to run snakemake
     """
     stdout_buf = io.StringIO()
-    with contextlib.redirect_stderr(stdout_buf):
+
+    if verbose:
+        ctx = contextlib.redirect_stderr(Tee(sys.stderr, stdout_buf))
+    else:
+        ctx = contextlib.redirect_stderr(stdout_buf)
+
+    with ctx:
         successful = snakemake(
             snk_file,
             config=config,
@@ -47,33 +75,36 @@ def run_snakemake(
         stdout = stdout_buf.getvalue()
         log_path, run_id = _get_log_and_run_id_from_log(stdout)
 
+        # Construct results_path from config
+        results_path = None
+        if config:
+            output_dir = config.get("output_dir", "")
+            output_file = config.get("output_file", "results.json")
+            if output_dir and output_file:
+                results_path = f"{output_dir}/{output_file}"
+
         try:
             if successful:
                 return SnakemakeResponse(
                     run_id=run_id,
-                    script_path=snk_file,
-                    config_path=config_file,
-                    status=RunStatus.SUCCESS.value,
+                    status=RunStatus.SUCCESS,
                     log_path=log_path,
-                    log_content=stdout,
+                    results_path=results_path,
+                    captured_output=stdout,
                 )
             else:
                 return SnakemakeResponse(
                     run_id=run_id,
-                    script_path=snk_file,
-                    config_path=config_file,
-                    status=RunStatus.FAIL.value,
+                    status=RunStatus.FAIL,
                     log_path=log_path,
-                    log_content=stdout,
-                    error=SnakemakeExecutionFailed(snk_file),
+                    results_path=results_path,
+                    captured_output=stdout,
                 )
-        except:
+        except Exception as e:
             return SnakemakeResponse(
                 run_id=run_id,
-                script_path=snk_file,
-                config_path=config_file,
-                status=RunStatus.FAIL.value,
+                status=RunStatus.FAIL,
                 log_path=log_path,
-                log_content=stdout,
-                error=Exception,
+                results_path=results_path,
+                captured_output=stdout_buf.getvalue(),
             )

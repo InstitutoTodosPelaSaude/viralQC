@@ -7,7 +7,7 @@ O ViralQC fornece três comandos principais através da CLI (`vqc`).
 Baixa e configura os datasets do Nextclade localmente.
 
 ```{important}
-Este comando deve ser executado **pelo menos uma vez** antes de usar o `run-from-fasta`.
+Este comando deve ser executado **pelo menos uma vez** antes de usar o `run`.
 ```
 
 ### Uso
@@ -22,6 +22,7 @@ vqc get-nextclade-datasets --cores 2
 |-----------|------|--------|-----------|
 | `--datasets-dir` | String | `datasets` | Diretório para armazenar datasets |
 | `--cores` | Integer | `1` | Número de threads/cores |
+| `--verbose` | Booleano | `False` | Exibir logs do snakemake |
 
 ### Estrutura de Saída
 
@@ -43,7 +44,7 @@ datasets/
 Cria um banco de dados BLAST local contendo genomas virais do NCBI RefSeq.
 
 ```{important}
-Este comando deve ser executado **pelo menos uma vez** antes de usar o `run-from-fasta`.
+Este comando deve ser executado **pelo menos uma vez** antes de usar o `run`.
 ```
 
 ### Uso
@@ -59,6 +60,7 @@ vqc get-blast-database
 | `--output-dir` | String | `datasets` | Diretório para o banco BLAST |
 | `--release-date` | String | `None` | Filtrar sequências por data de release (YYYY-MM-DD). Apenas sequências liberadas até esta data serão incluídas |
 | `--cores` | Integer | `1` | Número de threads/cores |
+| `--verbose` | Booleano | `False` | Exibir logs do snakemake |
 
 ### Filtragem por Data de Release
 
@@ -103,21 +105,21 @@ datasets/
 
 ---
 
-## run-from-fasta
+## run
 
 Comando principal de análise. Identifica vírus, realiza controle de qualidade e extrai regiões-alvo.
 
 ### Uso
 
 ```bash
-vqc run-from-fasta --sequences-fasta minhas_sequencias.fasta
+vqc run --input minhas_sequencias.fasta
 ```
 
 ### Parâmetros Obrigatórios
 
 | Parâmetro | Tipo | Descrição |
 |-----------|------|-----------|
-| `--sequences-fasta` | String | Caminho para o arquivo FASTA de entrada |
+| `--input` | String | Caminho para o arquivo FASTA de entrada |
 
 ### Parâmetros de Saída
 
@@ -165,13 +167,13 @@ O parâmetro `--blast-task` controla a sensibilidade do algoritmo:
 
 ```bash
 # Padrão (megablast) - rápido, para sequências similares
-vqc run-from-fasta --sequences-fasta seqs.fasta
+vqc run --input seqs.fasta
 
 # Busca mais sensível para vírus distantes
-vqc run-from-fasta --sequences-fasta seqs.fasta --blast-task dc-megablast
+vqc run --input seqs.fasta --blast-task dc-megablast
 
 # BLASTN tradicional para sequências divergentes
-vqc run-from-fasta --sequences-fasta seqs.fasta --blast-task blastn
+vqc run --input seqs.fasta --blast-task blastn
 ```
 
 ### Parâmetros de Sistema
@@ -179,12 +181,13 @@ vqc run-from-fasta --sequences-fasta seqs.fasta --blast-task blastn
 | Parâmetro | Tipo | Padrão | Descrição |
 |-----------|------|--------|-----------|
 | `--cores` | Integer | `1` | Número de threads/cores |
+| `--verbose` | Booleano | `False` | Exibir logs do snakemake |
 
 ### Exemplo Completo
 
 ```bash
-vqc run-from-fasta \
-  --sequences-fasta amostras.fasta \
+vqc run \
+  --input amostras.fasta \
   --output-dir resultados \
   --output-file relatorio.tsv \
   --blast-pident 75 \
@@ -199,3 +202,86 @@ vqc run-from-fasta \
 3. **Nextclade Run**: Análise de controle de qualidade
 4. **Pós-processamento**: Combina e pontua resultados
 5. **Extração de Regiões**: Extrai regiões-alvo baseado em qualidade
+
+
+## API
+
+Como o propósito do viralQC é sua integração com banco de dados genômicos de vírus, é possível integrar o módulo de análise no código de outras aplicações.
+
+Isso pode ser feito importando a classe `RunAnalysis` do módulo `viralqc.core.run_analysis`. Essa classe possui o método `run` que executa a análise de qualidade de um genoma viral, recebendo como parâmetro o caminho para o arquivo FASTA contendo as sequências a serem analisadas. Outros parametros podem ser informados de forma otimizada.
+
+### Uso
+
+```python
+from viralqc.core.run_analysis import RunAnalysis
+
+input_file = "seqs.fasta"
+output_directory = "results"
+output_file = "results.json"
+run_analysis = RunAnalysis()
+
+snakemake_response = run_analysis.run(
+        sequences_fasta=input_file,
+        output_dir=output_directory,
+        output_file=output_file
+)
+```
+
+Ou uma abordagem flexível
+
+```python
+from viralqc.core.run_analysis import RunAnalysis
+
+input_file = "seqs.fasta"
+output_directory = "results"
+output_file = "results.json"
+run_analysis = RunAnalysis()
+
+snakemake_response = run_analysis.run(
+        sequences_fasta=input_file,
+        output_dir=output_directory,
+        output_file=output_file,
+        cores=2,
+        datasets_local_path="datasets",
+        nextclade_sort_min_score=0.1,
+        nextclade_sort_min_hits=10,
+        blast_database="datasets/blast.fasta",
+        blast_database_metadata="datasets/blast.tsv",
+        blast_identity_threshold=0,
+        blast_evalue=0.01,
+        blast_qcov=0,
+        blast_task="blastn"
+)
+```
+
+Para checar os resultados:
+
+```python
+if snakemake_response.status == 200:
+    results_data = snakemake_response.get_results()
+    for seq_result in results_data:
+        virus = seq_result.get("virus")
+        quality = seq_result.get("genomeQuality")
+        coverage = seq_result.get("coverage")
+        print(virus, quality, coverage)
+else:
+    raise Exception(snakemake_response.format_log())
+```
+
+### Atributos e Métodos
+
+O método `run` retorna um objeto `SnakemakeResponse` que possui os atributos:
+
+| Atributo | Tipo | Descrição |
+| run_id | str | ID da execução |
+| status | RunStatus | Status da execução, que pode ser 200 (sucesso) ou 500 (falha) |
+| log_path | str | Caminho para o arquivo de log |
+| results_path | str | Caminho para o arquivo de resultados |
+
+E os seguintes métodos:
+
+| Método | Descrição |
+|--------|-----------|
+| `format_log()` | Retorna o conteúdo do arquivo de log formatado |
+| `get_results()` | Retorna o conteúdo do arquivo de resultados em formato de dicionário |
+

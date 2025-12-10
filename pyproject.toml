@@ -10,8 +10,6 @@ requires-python = ">=3.8,<3.12"
 license = { text = "MIT" }
 dependencies = [
     "typer>=0.16",
-    "fastapi>=0.116",
-    "uvicorn[standard]>=0.35",
     "colorlog>=6.3",
     "pyyaml>=6.0",
     "pandas>=2.2",
@@ -35,14 +33,6 @@ cli = [
     "typer>=0.16",
     "colorlog>=6.3"
 ]
-api = [
-    "fastapi>=0.116",
-    "uvicorn[standard]>=0.35",
-    "python-multipart==0.0.20"
-]
-all = [
-    "vqc[cli,api]"
-]
 dev = [
     "black>=24.3",
     "pytest>=8.0",
@@ -50,7 +40,6 @@ dev = [
 
 [project.scripts]
 vqc = "viralqc.cli:app"
-vqc-server = "viralqc.api:start"
 
 [build-system]
 requires = ["hatchling"]

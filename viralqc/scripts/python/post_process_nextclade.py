@@ -101,6 +101,7 @@ def load_blast_metadata(metadata_path: Path) -> DataFrame:
         "segment",
         "virus_name",
         "virus_tax_id",
+        "release_date",
         "species_name",
         "species_tax_id",
         "dataset_with_version",

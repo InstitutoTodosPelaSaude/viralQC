@@ -10,6 +10,8 @@ This documentation is also available in **English**: [Click here](https://viralq
 
 A ferramenta utiliza o [Nextclade](https://docs.nextstrain.org/projects/nextclade/en/stable/), o [BLAST](https://www.ncbi.nlm.nih.gov/books/NBK279690/) e uma série de lógicas internas para classificar sequências virais e realizar controle de qualidade de genomas completos, regiões ou genes-alvo.
 
+A ferramenta foi desenvolvida com o objetivo de automatizar o uso das ferramentas Nextclade e BLAST pensando na integração com bancos de dados genômicos de diferentes vírus, de modo a diminuir erros de submissão (como por exemplo, submissão de genomas com informação taxonômica incorreta) e também providenciar para o usuário métricas de qualidade de genomas virais mesclando as métricas do Nextclade disponibilizadas por datasets padronizados mas também providenciar métricas generalistas e anotações com base nos genomas de referência (refseq) disponibilizados pelo NCBI.
+
 ## Principais Funcionalidades
 
 - **Identificação automática de vírus** usando Nextclade e BLAST

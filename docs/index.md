@@ -10,6 +10,8 @@ Esta documentação também está disponível em **Português**: [Clique aqui](h
 
 The tool uses [Nextclade](https://docs.nextstrain.org/projects/nextclade/en/stable/), [BLAST](https://www.ncbi.nlm.nih.gov/books/NBK279690/), and a series of internal logics to classify viral sequences and perform quality control of complete genomes, regions, or target genes.
 
+The tool was developed with the goal of automating the use of Nextclade and BLAST tools, focusing on integration with viral genomic databases, in order to reduce submission errors (such as submitting genomes with incorrect taxonomic information) and also to provide the user viral genome quality metrics of submitted sequences, combining Nextclade metrics provided by standardized datasets, as well as providing general metrics and annotations based on reference genomes (refseq) provided by NCBI.
+
 ## Main Features
 
 - **Automatic virus identification** using Nextclade and BLAST
