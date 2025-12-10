@@ -67,7 +67,7 @@ vqc --help
 
 ### get-nextclade-datasets
 
-This command configures local datasets using nextclade. It is necessary to run at least once to generate a local copy of the nextclade datasets, before running the `run-from-fasta` command
+This command configures local datasets using nextclade. It is necessary to run at least once to generate a local copy of the nextclade datasets, before running the `run` command
 
 ```bash
 vqc get-nextclade-datasets --cores 2
@@ -81,7 +81,7 @@ vqc get-nextclade-datasets --cores 2 --datasets-dir <directory_name>
 
 ### get-blast-database
 
-This command configures local blast database with all ncbi refseq viral genomes. It is necessary to run at least once to generate a local blast database, before running the `run-from-fasta` command.
+This command configures local blast database with all ncbi refseq viral genomes. It is necessary to run at least once to generate a local blast database, before running the `run` command.
 
 ```bash
 vqc get-blast-database --cores 2
@@ -93,19 +93,19 @@ A output directory name can be specified, the default is `datasets`.
 vqc get-blast-database --cores 2 --output-dir <directory_name>
 ```
 
-### run-from-fasta
+### run
 
 This command runs several steps to identify viruses represented in the input FASTA file and executes Nextclade for each identified virus/dataset.
 
-#### run-from-fasta
+#### run
 
 ```bash
-vqc run-from-fasta --sequences-fasta test_data/sequences.fasta
+vqc run --sequences-fasta test_data/sequences.fasta
 ```
 
 Some parameters can be specified:
 
-- `--sequences-fasta` — **Required.** Path to the input FASTA file.
+- `--input` — **Required.** Path to the input FASTA file.
 - `--output-dir` — Output directory name. **Default:** `output`
 - `--output-file` — File to write final results. Valid extensions: .csv, .tsv or .json. **Default:** `results.tsv`
 - `--datasets-dir` — Path to local directory containing nextclade datasets. **Default:** `datasets`
@@ -194,11 +194,11 @@ This command builds a local BLAST database containing all viral genomes from NCB
 4.  **Create BLAST DB:** It uses `makeblastdb` to create the searchable BLAST database.
 5.  **Generate GFFs:** It converts the JSONL annotation reports from NCBI into GFF3 format using `jsonl_to_gff.py`. **Crucially**, this step filters out accessions where the CDS length is not divisible by 3 or other structural anomalies, ensuring that only valid annotations are used for generic Nextclade runs.
 
-### run-from-fasta
+### run
 
 This is the main analysis command. It takes a FASTA file of query sequences and performs virus identification, clade assignment, and quality control.
 
-![run-from-fasta](assets/run_from_fasta.svg)
+![run](assets/run_from_fasta.svg)
 
 **Logic:**
 1.  **Nextclade Sort:** The input sequences are first passed to `nextclade sort`. This tool compares the sequences against the local Nextclade datasets (including the external ones via the minimizer index) to identify which virus each sequence belongs to.
