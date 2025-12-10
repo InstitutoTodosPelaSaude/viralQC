@@ -1,4 +1,20 @@
 from viralqc import PKG_PATH
+from viralqc.core.defaults import (
+    DEFAULT_CONFIG_FILE,
+    DEFAULT_OUTPUT_DIR,
+    DEFAULT_OUTPUT_FILE,
+    DEFAULT_OUTPUT_FORMAT,
+    DEFAULT_DATASETS_LOCAL_PATH,
+    DEFAULT_NEXTCLADE_SORT_MIN_SCORE,
+    DEFAULT_NEXTCLADE_SORT_MIN_HITS,
+    DEFAULT_BLAST_DATABASE,
+    DEFAULT_BLAST_DATABASE_METADATA,
+    DEFAULT_BLAST_IDENTITY_THRESHOLD,
+    DEFAULT_BLAST_EVALUE,
+    DEFAULT_BLAST_QCOV,
+    DEFAULT_BLAST_TASK,
+    DEFAULT_CORES,
+)
 import csv
 import logging
 import os
@@ -8,20 +24,21 @@ logging.basicConfig(level=logging.WARNING, format='%(levelname)s:%(message)s')
 rule parameters:
     params:
         sequences_fasta = config["sequences_fasta"],
-        output_dir = config["output_dir"],
-        output_file = config["output_file"],
-        output_format = config["output_format"],
-        config_file = config["config_file"],
-        datasets_local_path = config["datasets_local_path"],
-        external_datasets_minimizers = f"{config['datasets_local_path']}/external_datasets_minimizers.json",
-        nextclade_sort_min_score = config["nextclade_sort_min_score"],
-        nextclade_sort_min_hits = config["nextclade_sort_min_hits"],
-        blast_database = config["blast_database"],
-        blast_database_metadata = config["blast_database_metadata"],
-        blast_identity_threshold = config["blast_identity_threshold"],
-        blast_evalue = config["blast_evalue"],
-        blast_qcov = config["blast_qcov"],
-        threads = config["threads"]
+        output_dir = config.get("output_dir", DEFAULT_OUTPUT_DIR),
+        output_file = config.get("output_file", DEFAULT_OUTPUT_FILE),
+        output_format = config.get("output_format", DEFAULT_OUTPUT_FORMAT),
+        config_file = config.get("config_file", DEFAULT_CONFIG_FILE),
+        datasets_local_path = config.get("datasets_local_path", DEFAULT_DATASETS_LOCAL_PATH),
+        external_datasets_minimizers = f"{config.get('datasets_local_path', DEFAULT_DATASETS_LOCAL_PATH)}/external_datasets_minimizers.json",
+        nextclade_sort_min_score = config.get("nextclade_sort_min_score", DEFAULT_NEXTCLADE_SORT_MIN_SCORE),
+        nextclade_sort_min_hits = config.get("nextclade_sort_min_hits", DEFAULT_NEXTCLADE_SORT_MIN_HITS),
+        blast_database = config.get("blast_database", DEFAULT_BLAST_DATABASE),
+        blast_database_metadata = config.get("blast_database_metadata", DEFAULT_BLAST_DATABASE_METADATA),
+        blast_identity_threshold = config.get("blast_identity_threshold", DEFAULT_BLAST_IDENTITY_THRESHOLD),
+        blast_evalue = config.get("blast_evalue", DEFAULT_BLAST_EVALUE),
+        blast_qcov = config.get("blast_qcov", DEFAULT_BLAST_QCOV),
+        blast_task = config.get("blast_task", DEFAULT_BLAST_TASK),
+        threads = config.get("threads", DEFAULT_CORES)
 
 parameters = rules.parameters.params
 
@@ -152,6 +169,7 @@ rule blast:
         identity_threshold = parameters.blast_identity_threshold,
         blast_evalue = parameters.blast_evalue,
         blast_qcov = parameters.blast_qcov,
+        blast_task = parameters.blast_task,
         output_dir = parameters.output_dir
     output:
         viruses_identified = f"{parameters.output_dir}/blast_results/unmapped_sequences.blast.tsv",
@@ -167,7 +185,7 @@ rule blast:
             blastn -db {input.blast_database} \
                 -query {params.output_dir}/blast_results/unmapped_sequences.fasta \
                 -out {output.viruses_identified} \
-                -task megablast \
+                -task {params.blast_task} \
                 -evalue {params.blast_evalue} \
                 -qcov_hsp_perc {params.blast_qcov} \
                 -outfmt "6 qseqid qlen sseqid slen qstart qend sstart send evalue bitscore pident qcovs qcovhsp" \
