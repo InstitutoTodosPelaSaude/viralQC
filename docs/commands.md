@@ -274,6 +274,7 @@ else:
 The `run` method returns a `SnakemakeResponse` object that has the following attributes:
 
 | Attribute | Type | Description |
+|-----------|------|-------------|
 | run_id | str | Execution ID |
 | status | RunStatus | Execution status, which can be 200 (success) or 500 (failure) |
 | log_path | str | Path to the log file |

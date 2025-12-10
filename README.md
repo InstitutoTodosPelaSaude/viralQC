@@ -1,6 +1,10 @@
-## Install
+## ViralQC
 
 ViralQC is a tool and package for quality control of consensus virus genomes which uses the [nextclade tool](https://docs.nextstrain.org/projects/nextclade/en/stable/), [BLAST](https://www.ncbi.nlm.nih.gov/books/NBK279690/) and a series of internal logics to classify viral sequences and perform quality control of complete genomes, regions or target genes.
+
+The complete documentation is available at [read the docs](https://viralqc.readthedocs.io/).
+
+## Install
 
 ### From pip
 
