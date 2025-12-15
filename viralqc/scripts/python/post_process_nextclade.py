@@ -96,21 +96,22 @@ def load_blast_metadata(metadata_path: Path) -> DataFrame:
     Returns:
         Dataframe containing the BLAST metadata.
     """
-    names_metadata = [
-        "virus",
-        "segment",
-        "virus_name",
-        "virus_tax_id",
-        "release_date",
-        "species_name",
-        "species_tax_id",
-        "dataset_with_version",
-    ]
+    column_mapping = {
+        "accession": "virus",
+        "segment": "segment",
+        "virus_name": "virus_name",
+        "virus_tax_id": "virus_tax_id",
+        "release_date": "release_date",
+        "species_name": "species_name",
+        "species_tax_id": "species_tax_id",
+        "database_version": "dataset_with_version",
+    }
     try:
-        df = read_csv(metadata_path, sep="\t", header=None, names=names_metadata)
+        df = read_csv(metadata_path, sep="\t", header=0)
+        df = df.rename(columns=column_mapping)
         return df.loc[:, ~df.columns.duplicated()]
     except Exception:
-        return DataFrame(columns=names_metadata)
+        return DataFrame(columns=list(column_mapping.values()))
 
 
 def format_sc2_clade(df: DataFrame, dataset_name: str) -> DataFrame:
@@ -680,7 +681,7 @@ def create_unmapped_df(
         A dataframe of unmapped sequences.
     """
     with open(unmapped_sequences, "r") as f:
-        data = [(line.strip(), "Unclassified") for line in f]
+        data = [(line.strip().strip('"').strip("'"), "Unclassified") for line in f]
     df = DataFrame(data, columns=["seqName", "virus"])
 
     for col in TARGET_COLUMNS.keys():
@@ -747,9 +748,12 @@ def create_unmapped_df(
             virus_species_tax_id=final_df["species_tax_id"].astype("Int64"),
             segment=final_df["segment_df2"].fillna("Unsegmented").astype(str),
         )
-        final_df[["dataset", "datasetVersion"]] = final_df[
-            "dataset_with_version"
-        ].str.split("_", n=1, expand=True)
+        split_result = final_df["dataset_with_version"].str.split("_", n=1, expand=True)
+        if split_result.shape[1] == 2:
+            final_df[["dataset", "datasetVersion"]] = split_result
+        else:
+            final_df["dataset"] = None
+            final_df["datasetVersion"] = None
 
     return final_df.loc[:, ~final_df.columns.duplicated()]
 
