@@ -1,6 +1,9 @@
 import argparse
 from pathlib import Path
 import csv
+import sys
+
+csv.field_size_limit(sys.maxsize)
 
 
 def read_gff_gene_order(gff_file: Path) -> list[str]:
