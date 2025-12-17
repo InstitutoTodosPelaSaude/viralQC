@@ -75,7 +75,7 @@ def read_pp_nextclade(pp_results: Path, output_format: str) -> DataFrame:
 def check_target_regions(pp_results: DataFrame) -> dict:
     """
     Creates a dictionary mapping sequence names to target region names based on quality criteria.
-    If the genomeQuality is "good", the target region will be "genome"; otherwise, it will take
+    If the genomeQuality is "A" or "B", the target region will be "genome"; otherwise, it will take
     the value from the targetRegions or targetGene column.
 
     Briefly, the logic prioritizes regions with good quality status in the following order:
@@ -119,8 +119,14 @@ def get_regions(target_regions: dict, gff_info: DataFrame) -> dict:
     sequences_intervals = {}
     seq_to_gff = {seq: df for seq, df in gff_info.groupby("seqname")}
     for seq, region in target_regions.items():
-        df_seq = seq_to_gff.get(seq)
+        if " " in seq:
+            seq_norm = seq.split()[0]
+        else:
+            seq_norm = seq
+        df_seq = seq_to_gff.get(seq_norm)
         if df_seq is None:
+            continue
+        if type(region) == float:
             continue
 
         if region == "genome":

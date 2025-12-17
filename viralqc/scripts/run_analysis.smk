@@ -182,17 +182,18 @@ rule blast:
         mkdir -p {params.output_dir}/blast_results
         if [ -s {input.unmapped_sequences} ]; then
             seqtk subseq {input.sequences} {input.unmapped_sequences} > {params.output_dir}/blast_results/unmapped_sequences.fasta
-            blastn -db {input.blast_database} \
-                -query {params.output_dir}/blast_results/unmapped_sequences.fasta \
-                -out {output.viruses_identified} \
-                -task {params.blast_task} \
-                -evalue {params.blast_evalue} \
-                -qcov_hsp_perc {params.blast_qcov} \
-                -outfmt "6 qseqid qlen sseqid slen qstart qend sstart send evalue bitscore pident qcovs qcovhsp" \
-                -max_hsps 1 \
-                -max_target_seqs 1 \
-                -perc_identity {params.identity_threshold} \
-                -num_threads {threads} 2> {log}
+
+            python {PKG_PATH}/scripts/python/blast_wrapper.py \
+                --input {params.output_dir}/blast_results/unmapped_sequences.fasta \
+                --db {input.blast_database} \
+                --output {output.viruses_identified} \
+                --task {params.blast_task} \
+                --evalue {params.blast_evalue} \
+                --qcov {params.blast_qcov} \
+                --perc_identity {params.identity_threshold} \
+                --threads {threads} \
+                --outfmt "6 qseqid qlen sseqid slen qstart qend sstart send evalue bitscore pident qcovs qcovhsp" 2> {log}
+
             rm {params.output_dir}/blast_results/unmapped_sequences.fasta
         else
             touch {output.viruses_identified}
