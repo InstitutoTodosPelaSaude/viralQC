@@ -56,33 +56,36 @@ def run_snakemake(
     """
     cmd = ["snakemake", "-s", snk_file, "-c", str(cores), "all"]
 
-    config_files = []
-    if config_file:
-        if isinstance(config_file, list):
-            config_files.extend([str(cf) for cf in config_file])
-        else:
-            config_files.append(str(config_file))
+    merged_config = {}
 
-    temp_config_file = None
+    if config_file:
+        config_file_list = (
+            config_file if isinstance(config_file, list) else [config_file]
+        )
+        for cf in config_file_list:
+            with open(str(cf), "r") as f:
+                user_config = yaml.safe_load(f) or {}
+                merged_config.update(user_config)
+
     if config:
-        serializable_config = {}
         for key, value in config.items():
             if value is None:
                 continue
             if hasattr(value, "__fspath__"):
-                serializable_config[key] = str(value)
+                merged_config[key] = str(value)
             else:
-                serializable_config[key] = value
+                merged_config[key] = value
 
+    temp_config_file = None
+    if merged_config:
         temp_config_file = tempfile.NamedTemporaryFile(
             mode="w", suffix=".yaml", delete=False
         )
-        yaml.dump(serializable_config, temp_config_file)
+        yaml.dump(merged_config, temp_config_file)
+        temp_config_file.flush()
         temp_config_file.close()
-        config_files.append(temp_config_file.name)
 
-    for cf in config_files:
-        cmd.extend(["--configfile", cf])
+        cmd.extend(["--configfile", temp_config_file.name])
 
     if workdir:
         cmd.extend(["--directory", workdir])
