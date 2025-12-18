@@ -1,7 +1,10 @@
 import re
+import subprocess
+import tempfile
+import yaml
+import os
 from typing import Tuple, Optional
 from pathlib import Path
-from snakemake import snakemake
 from viralqc.core.models import SnakemakeResponse, RunStatus
 
 
@@ -40,27 +43,73 @@ def run_snakemake(
     verbose: bool = False,
 ) -> SnakemakeResponse:
     """
-    The snakemake module has runtime logic that must be handled with viralQA
-    modularization patterns, including:
-        - returns only a Boolean indicating whether the flow ran successfully or not.
-        - all logs are output as stderr on the console.
-
-    Therefore, this function handles this.
+    Run Snakemake via subprocess instead of using the Python API.
+    This ensures better isolation between concurrent runs.
 
     Keyword arguments:
         snk_file -- .snk snakemake file path
         config_file -- .yaml config file path
         cores -- number of cores used to run snakemake
+        config -- dictionary of config parameters
+        workdir -- working directory for snakemake
+        verbose -- whether to show verbose output
     """
-    successful = snakemake(
-        snk_file,
-        config=config,
-        configfiles=config_file,
-        cores=cores,
-        targets=["all"],
-        workdir=workdir,
-        quiet=not verbose,
-    )
+    cmd = ["snakemake", "-s", snk_file, "-c", str(cores), "all"]
+
+    config_files = []
+    if config_file:
+        if isinstance(config_file, list):
+            config_files.extend([str(cf) for cf in config_file])
+        else:
+            config_files.append(str(config_file))
+
+    temp_config_file = None
+    if config:
+        serializable_config = {}
+        for key, value in config.items():
+            if value is None:
+                continue
+            if hasattr(value, "__fspath__"):
+                serializable_config[key] = str(value)
+            else:
+                serializable_config[key] = value
+
+        temp_config_file = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        )
+        yaml.dump(serializable_config, temp_config_file)
+        temp_config_file.close()
+        config_files.append(temp_config_file.name)
+
+    for cf in config_files:
+        cmd.extend(["--configfile", cf])
+
+    if workdir:
+        cmd.extend(["--directory", workdir])
+
+    if not verbose:
+        cmd.append("--quiet")
+
+    try:
+        if verbose:
+            result = subprocess.run(cmd, text=True, check=False)
+            captured_output = ""
+        else:
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            captured_output = ""
+            if result.stdout:
+                captured_output += result.stdout
+            if result.stderr:
+                captured_output += "\n" + result.stderr
+
+        successful = result.returncode == 0
+
+    except Exception as e:
+        successful = False
+        captured_output = f"Exception during Snakemake execution: {str(e)}"
+    finally:
+        if temp_config_file and os.path.exists(temp_config_file.name):
+            os.unlink(temp_config_file.name)
 
     log_path, run_id = _get_log_path_from_workdir(workdir)
 
@@ -71,28 +120,19 @@ def run_snakemake(
         if output_dir and output_file:
             results_path = f"{output_dir}/outputs/{output_file}"
 
-    try:
-        if successful:
-            return SnakemakeResponse(
-                run_id=run_id,
-                status=RunStatus.SUCCESS,
-                log_path=log_path,
-                results_path=results_path,
-                captured_output="",
-            )
-        else:
-            return SnakemakeResponse(
-                run_id=run_id,
-                status=RunStatus.FAIL,
-                log_path=log_path,
-                results_path=results_path,
-                captured_output="",
-            )
-    except Exception as e:
+    if successful:
+        return SnakemakeResponse(
+            run_id=run_id,
+            status=RunStatus.SUCCESS,
+            log_path=log_path,
+            results_path=results_path,
+            captured_output=captured_output,
+        )
+    else:
         return SnakemakeResponse(
             run_id=run_id,
             status=RunStatus.FAIL,
             log_path=log_path,
             results_path=results_path,
-            captured_output=f"Exception during Snakemake execution: {str(e)}",
+            captured_output=captured_output,
         )
