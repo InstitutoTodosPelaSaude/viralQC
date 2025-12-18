@@ -44,13 +44,15 @@ rule parameters:
 parameters = rules.parameters.params
 
 
-
-count_get_nextclade_outputs_run = 0
+_run_counters = {}
 def get_nextclade_outputs(wildcards):
+    output_dir = parameters.output_dir
+    if output_dir not in _run_counters:
+        _run_counters[output_dir] = 0
+
     datasets_selected_file = checkpoints.select_datasets_from_nextclade.get(**wildcards).output.datasets_selected
     viruses = set()
     dataset_not_found = []
-    global count_get_nextclade_outputs_run
 
     with open(datasets_selected_file, 'r') as f:
         reader = csv.DictReader(f, delimiter='\t')
@@ -59,14 +61,14 @@ def get_nextclade_outputs(wildcards):
                 virus_name = row.get('localDataset').split('/')[-1]
                 viruses.add(virus_name)
             else:
-                if count_get_nextclade_outputs_run == 0 and row['dataset'] not in dataset_not_found:
+                if _run_counters[output_dir] == 0 and row['dataset'] not in dataset_not_found:
                     workflow_logger.warning(f"The '{row['dataset']}' dataset was not found locally.")
                     dataset_not_found.append(row['dataset'])
 
     nextclade_results = [f"{parameters.output_dir}/nextclade_results/{virus}.nextclade.tsv" for virus in viruses]
-    if not nextclade_results and count_get_nextclade_outputs_run == 0:
+    if not nextclade_results and _run_counters[output_dir] == 0:
         workflow_logger.warning(f"Nextclade will not run for any input sequence.")
-    count_get_nextclade_outputs_run += 1
+    _run_counters[output_dir] += 1
     return nextclade_results
 
 rule all:
@@ -98,24 +100,26 @@ rule nextclade_sort:
         f"{parameters.output_dir}/logs/nextclade_sort.log"
     shell:
         """
-        mkdir -p {params.output_dir}/identified_datasets
-        mkdir -p {params.output_dir}/logs
+        set -euo pipefail
+
+        mkdir -p {params.output_dir}/identified_datasets 2>{log}
+        mkdir -p {params.output_dir}/logs 2>>{log}
 
         nextclade sort {input.sequences} \
             --output-path '{params.output_dir}/identified_datasets/{{name}}/sequences.fa' \
             --output-results-tsv {output.viruses_identified} \
             --min-score {params.min_score} \
             --min-hits {params.min_hits} \
-            --jobs {threads} 2>{log}
+            --jobs {threads} 2>>{log}
 
         # Run nextclade sort again using only sequences that were not mapped in the datasets from nextclade_data
         awk -F"\\t" '{{if ($3 == "") print $2}}' \
             {output.viruses_identified} > \
-            {params.output_dir}/identified_datasets/tmp_unmapped_sequences.txt
+            {params.output_dir}/identified_datasets/tmp_unmapped_sequences.txt 2>>{log} 
 
         if [ -s {params.output_dir}/identified_datasets/tmp_unmapped_sequences.txt ]; then
             seqtk subseq {input.sequences} {params.output_dir}/identified_datasets/tmp_unmapped_sequences.txt > \
-                {params.output_dir}/identified_datasets/tmp_unmapped_sequences.fasta
+                {params.output_dir}/identified_datasets/tmp_unmapped_sequences.fasta 2>>{log}
         fi
 
         if [ -s {params.output_dir}/identified_datasets/tmp_unmapped_sequences.fasta ]; then
@@ -127,10 +131,10 @@ rule nextclade_sort:
                 --min-hits {params.min_hits} \
                 --jobs {threads} 2>>{log}
         else
-            echo -e "seqName\tdataset\tscore\tnumHits" > {output.viruses_identified_external}
+            echo -e "seqName\tdataset\tscore\tnumHits" > {output.viruses_identified_external} 2>>{log}
         fi
 
-        rm {params.output_dir}/identified_datasets/tmp_unmapped_sequences.*
+        rm {params.output_dir}/identified_datasets/tmp_unmapped_sequences.* || true 2>>{log}
         """
 
 checkpoint select_datasets_from_nextclade:
@@ -201,24 +205,24 @@ rule blast:
         fi
         """
 
-virus_info = None
+_virus_info_cache = {}
 def get_virus_info(wildcards, field):
-    global virus_info
-    if virus_info is None:
-        virus_info = {}
+    output_dir = parameters.output_dir
+    if output_dir not in _virus_info_cache:
+        _virus_info_cache[output_dir] = {}
         datasets_selected_file = checkpoints.select_datasets_from_nextclade.get().output.datasets_selected
         with open(datasets_selected_file, 'r') as f:
             reader = csv.DictReader(f, delimiter='\t')
             for row in reader:
                 localDataset = row.get('localDataset')
                 virus_name = localDataset.split('/')[-1]
-                if virus_name not in virus_info:
-                    virus_info[virus_name] = {
+                if virus_name not in _virus_info_cache[output_dir]:
+                    _virus_info_cache[output_dir][virus_name] = {
                         'splittedFasta': row.get('splittedFasta'),
                         'localDataset': row.get('localDataset')
                     }
 
-    return virus_info[wildcards.virus][field]
+    return _virus_info_cache[output_dir][wildcards.virus][field]
 
 def get_fasta_for_virus(wildcards):
     return get_virus_info(wildcards, 'splittedFasta')
