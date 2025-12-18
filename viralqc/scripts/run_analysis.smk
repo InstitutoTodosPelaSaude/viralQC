@@ -24,7 +24,7 @@ logging.basicConfig(level=logging.WARNING, format='%(levelname)s:%(message)s')
 rule parameters:
     params:
         sequences_fasta = config["sequences_fasta"],
-        output_dir = config.get("output_dir", DEFAULT_OUTPUT_DIR),
+        output_dir = DEFAULT_OUTPUT_DIR,
         output_file = config.get("output_file", DEFAULT_OUTPUT_FILE),
         output_format = config.get("output_format", DEFAULT_OUTPUT_FORMAT),
         config_file = config.get("config_file", DEFAULT_CONFIG_FILE),

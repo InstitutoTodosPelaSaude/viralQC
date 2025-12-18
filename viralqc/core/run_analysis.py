@@ -52,17 +52,17 @@ class RunAnalysis:
     ) -> SnakemakeResponse:
         output_format = self._get_output_format(str(output_file))
         config = {
-            "sequences_fasta": sequences_fasta,
+            "sequences_fasta": Path(sequences_fasta).resolve(),
             "output_dir": output_dir,
             "output_file": output_file,
             "output_format": output_format,
             "config_file": config_file,
-            "datasets_local_path": datasets_local_path,
+            "datasets_local_path": Path(datasets_local_path).resolve(),
             "threads": cores,
             "nextclade_sort_min_score": nextclade_sort_min_score,
             "nextclade_sort_min_hits": nextclade_sort_min_hits,
-            "blast_database": blast_database,
-            "blast_database_metadata": blast_database_metadata,
+            "blast_database": Path(blast_database).resolve(),
+            "blast_database_metadata": Path(blast_database_metadata).resolve(),
             "blast_identity_threshold": blast_identity_threshold,
             "blast_evalue": blast_evalue,
             "blast_qcov": blast_qcov,
@@ -70,6 +70,11 @@ class RunAnalysis:
         }
 
         snakemake_response = run_snakemake(
-            snk_file, [config_file], cores, config, verbose
+            snk_file=snk_file,
+            config_file=[config_file],
+            cores=cores,
+            config=config,
+            workdir=output_dir,
+            verbose=verbose,
         )
         return snakemake_response

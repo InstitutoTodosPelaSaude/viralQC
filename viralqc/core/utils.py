@@ -42,6 +42,7 @@ def run_snakemake(
     config_file: Path | None = None,
     cores: int = 1,
     config: dict = None,
+    workdir: str = None,
     verbose: bool = False,
 ) -> SnakemakeResponse:
     """
@@ -71,6 +72,7 @@ def run_snakemake(
             configfiles=config_file,
             cores=cores,
             targets=["all"],
+            workdir=workdir,
         )
         stdout = stdout_buf.getvalue()
         log_path, run_id = _get_log_and_run_id_from_log(stdout)
@@ -81,7 +83,7 @@ def run_snakemake(
             output_dir = config.get("output_dir", "")
             output_file = config.get("output_file", "results.json")
             if output_dir and output_file:
-                results_path = f"{output_dir}/{output_file}"
+                results_path = f"{output_dir}/outputs/{output_file}"
 
         try:
             if successful:

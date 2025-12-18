@@ -125,7 +125,7 @@ vqc run --input my_sequences.fasta
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `--output-dir` | String | `output` | Directory for output files |
+| `--output-dir` | String | `outputs` | Working directory. Results will be stored in an `outputs/` subdirectory within this folder. |
 | `--output-file` | String | `results.tsv` | Results file (`.tsv`, `.csv`, or `.json`) |
 
 ### Dataset Parameters
@@ -210,8 +210,6 @@ How the viralQC is designed to integrate with viral genomic databases, it is pos
 This can be done by importing the `RunAnalysis` class from the `viralqc.core.run_analysis` module. This class has the `run` method that executes the quality analysis of a viral genome, receiving as parameter the path to the FASTA file containing the sequences to be analyzed. Other parameters can be informed in an optimized way.
 
 ### Usage
-
-!important  
 
 ```python
 from viralqc.core.run_analysis import RunAnalysis
