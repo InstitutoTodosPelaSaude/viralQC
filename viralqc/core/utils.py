@@ -1,39 +1,33 @@
-import io, contextlib, re, sys
+import re
 from typing import Tuple, Optional
 from pathlib import Path
 from snakemake import snakemake
 from viralqc.core.models import SnakemakeResponse, RunStatus
 
 
-class Tee(object):
+def _get_log_path_from_workdir(workdir: str) -> Tuple[str, Optional[str]]:
     """
-    Redirects output to multiple files, the flush method is called for each file
-    in order to ensure that the output is written to all files and that the
-    output is not buffered, so in the context of this code the content is directly
-    written to the log files and printed to the console (if verbose=True).
+    Find the most recent Snakemake log file in the workdir.
+    Returns (log_path, run_id) tuple.
     """
+    if not workdir:
+        return "This execution has no log file.", None
 
-    def __init__(self, *files):
-        self.files = files
+    log_dir = Path(workdir) / ".snakemake" / "log"
 
-    def write(self, obj):
-        for f in self.files:
-            f.write(obj)
-            f.flush()
+    if not log_dir.exists():
+        return "This execution has no log file.", None
 
-    def flush(self):
-        for f in self.files:
-            f.flush()
+    log_files = list(log_dir.glob("*.snakemake.log"))
 
+    if not log_files:
+        return "This execution has no log file.", None
+    most_recent_log = max(log_files, key=lambda p: p.stat().st_mtime)
+    log_path = str(most_recent_log)
 
-def _get_log_and_run_id_from_log(log_lines: str) -> Tuple[str, Optional[str]]:
-    last_line = log_lines.strip().split("\n")[-1]
-    match = re.search(r"\d{4}-\d{2}-\d{2}T\d{6}\.\d+", last_line)
-    if "Complete log" in last_line:
-        log_path = re.sub("Complete log: ", "", last_line)
-    else:
-        log_path = "This execution has no log file."
-    run_id = match.group() if match else None
+    match = re.search(r"(\d{4}-\d{2}-\d{2}T\d{6}\.\d+)", most_recent_log.name)
+    run_id = match.group(1) if match else None
+
     return log_path, run_id
 
 
@@ -58,55 +52,47 @@ def run_snakemake(
         config_file -- .yaml config file path
         cores -- number of cores used to run snakemake
     """
-    stdout_buf = io.StringIO()
+    successful = snakemake(
+        snk_file,
+        config=config,
+        configfiles=config_file,
+        cores=cores,
+        targets=["all"],
+        workdir=workdir,
+        quiet=not verbose,
+    )
 
-    if verbose:
-        ctx = contextlib.redirect_stderr(Tee(sys.stderr, stdout_buf))
-    else:
-        ctx = contextlib.redirect_stderr(stdout_buf)
+    log_path, run_id = _get_log_path_from_workdir(workdir)
 
-    with ctx:
-        successful = snakemake(
-            snk_file,
-            config=config,
-            configfiles=config_file,
-            cores=cores,
-            targets=["all"],
-            workdir=workdir,
-        )
-        stdout = stdout_buf.getvalue()
-        log_path, run_id = _get_log_and_run_id_from_log(stdout)
+    results_path = None
+    if config:
+        output_dir = config.get("output_dir", "")
+        output_file = config.get("output_file", "results.json")
+        if output_dir and output_file:
+            results_path = f"{output_dir}/outputs/{output_file}"
 
-        # Construct results_path from config
-        results_path = None
-        if config:
-            output_dir = config.get("output_dir", "")
-            output_file = config.get("output_file", "results.json")
-            if output_dir and output_file:
-                results_path = f"{output_dir}/outputs/{output_file}"
-
-        try:
-            if successful:
-                return SnakemakeResponse(
-                    run_id=run_id,
-                    status=RunStatus.SUCCESS,
-                    log_path=log_path,
-                    results_path=results_path,
-                    captured_output=stdout,
-                )
-            else:
-                return SnakemakeResponse(
-                    run_id=run_id,
-                    status=RunStatus.FAIL,
-                    log_path=log_path,
-                    results_path=results_path,
-                    captured_output=stdout,
-                )
-        except Exception as e:
+    try:
+        if successful:
+            return SnakemakeResponse(
+                run_id=run_id,
+                status=RunStatus.SUCCESS,
+                log_path=log_path,
+                results_path=results_path,
+                captured_output="",
+            )
+        else:
             return SnakemakeResponse(
                 run_id=run_id,
                 status=RunStatus.FAIL,
                 log_path=log_path,
                 results_path=results_path,
-                captured_output=stdout_buf.getvalue(),
+                captured_output="",
             )
+    except Exception as e:
+        return SnakemakeResponse(
+            run_id=run_id,
+            status=RunStatus.FAIL,
+            log_path=log_path,
+            results_path=results_path,
+            captured_output=f"Exception during Snakemake execution: {str(e)}",
+        )

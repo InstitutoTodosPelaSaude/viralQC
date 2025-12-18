@@ -46,6 +46,7 @@ handler.setFormatter(
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logger.addHandler(handler)
+logger.propagate = False
 
 
 def log_multiline(text: str):

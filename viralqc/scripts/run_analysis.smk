@@ -19,7 +19,8 @@ import csv
 import logging
 import os
 
-logging.basicConfig(level=logging.WARNING, format='%(levelname)s:%(message)s')
+workflow_logger = logging.getLogger("viralqc.workflow")
+workflow_logger.setLevel(logging.WARNING)
 
 rule parameters:
     params:
@@ -59,12 +60,12 @@ def get_nextclade_outputs(wildcards):
                 viruses.add(virus_name)
             else:
                 if count_get_nextclade_outputs_run == 0 and row['dataset'] not in dataset_not_found:
-                    logging.warning(f"The '{row['dataset']}' dataset was not found locally.")
+                    workflow_logger.warning(f"The '{row['dataset']}' dataset was not found locally.")
                     dataset_not_found.append(row['dataset'])
 
     nextclade_results = [f"{parameters.output_dir}/nextclade_results/{virus}.nextclade.tsv" for virus in viruses]
     if not nextclade_results and count_get_nextclade_outputs_run == 0:
-        logging.warning(f"Nextclade will not run for any input sequence.")
+        workflow_logger.warning(f"Nextclade will not run for any input sequence.")
     count_get_nextclade_outputs_run += 1
     return nextclade_results
 
