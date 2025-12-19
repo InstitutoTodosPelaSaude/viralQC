@@ -17,7 +17,12 @@ class GetNextcladeDatasets:
     ) -> SnakemakeResponse:
         config = {"datasets_dir": datasets_dir}
         snakemake_response = run_snakemake(
-            snk_file, [config_file], cores, config, verbose
+            snk_file=snk_file,
+            config_file=[config_file],
+            cores=cores,
+            config=config,
+            workdir=None,
+            verbose=verbose,
         )
         return snakemake_response
 
@@ -39,5 +44,12 @@ class GetBlastDatabase:
             "release_date": release_date,
         }
 
-        snakemake_response = run_snakemake(snk_file, None, cores, config, verbose)
+        snakemake_response = run_snakemake(
+            snk_file=snk_file,
+            config_file=None,
+            cores=cores,
+            config=config,
+            workdir=None,
+            verbose=verbose,
+        )
         return snakemake_response

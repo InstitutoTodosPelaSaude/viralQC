@@ -3,29 +3,31 @@
 When you run `run-from-fasta`, ViralQC creates the following output:
 
 ```
-output/
-├── identified_datasets/
-│   ├── datasets_selected.tsv
-│   ├── viruses.tsv
-│   ├── viruses.external_datasets.tsv
-│   ├── unmapped_sequences.txt
-│   └── <virus>/sequences.fa
-├── blast_results/
-│   ├── unmapped_sequences.blast.tsv
-│   └── blast_viruses.list
-├── nextclade_results/
-│   ├── <virus>.nextclade.tsv
-│   └── <accession>.generic.nextclade.tsv
-├── gff_files/
-│   ├── <virus>.nextclade.gff
-│   └── <accession>.generic.nextclade.gff
-├── logs/
-│   ├── nextclade_sort.log
-│   ├── blast.log
-│   └── ...
-├── results.tsv
-├── sequences_target_regions.bed
-└── sequences_target_regions.fasta
+outputs/             # User specified output directory (e.g., --output-dir my_results)
+└── .snakemake/     # Snakemake run files
+└── outputs/        # ViralQC output files
+    ├── identified_datasets/
+    │   ├── datasets_selected.tsv
+    │   ├── viruses.tsv
+    │   ├── viruses.external_datasets.tsv
+    │   ├── unmapped_sequences.txt
+    │   └── <virus>/sequences.fa
+    ├── blast_results/
+    │   ├── unmapped_sequences.blast.tsv
+    │   └── blast_viruses.list
+    ├── nextclade_results/
+    │   ├── <virus>.nextclade.tsv
+    │   └── <accession>.generic.nextclade.tsv
+    ├── gff_files/
+    │   ├── <virus>.nextclade.gff
+    │   └── <accession>.generic.nextclade.gff
+    ├── logs/
+    │   ├── nextclade_sort.log
+    │   ├── blast.log
+    │   └── ...
+    ├── results.tsv
+    ├── sequences_target_regions.bed
+    └── sequences_target_regions.fasta
 ```
 
 ### Main File: results.tsv (or .csv, .json)

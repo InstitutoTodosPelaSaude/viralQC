@@ -125,7 +125,7 @@ vqc run --input minhas_sequencias.fasta
 
 | Parâmetro | Tipo | Padrão | Descrição |
 |-----------|------|--------|-----------|
-| `--output-dir` | String | `output` | Diretório para arquivos de saída |
+| `--output-dir` | String | `outputs` | Diretório de trabalho. Os resultados serão armazenados em um subdiretório `outputs/` dentro desta pasta. |
 | `--output-file` | String | `results.tsv` | Arquivo de resultados (`.tsv`, `.csv`, `.json`) |
 
 ### Parâmetros de Datasets
