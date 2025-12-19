@@ -14,7 +14,7 @@ def _get_log_path_from_workdir(workdir: str) -> Tuple[str, Optional[str]]:
     Returns (log_path, run_id) tuple.
     """
     if not workdir:
-        return "This execution has no log file.", None
+        return "This execution has no working directory.", None
 
     log_dir = Path(workdir) / ".snakemake" / "log"
 
@@ -55,7 +55,6 @@ def run_snakemake(
         verbose -- whether to show verbose output
     """
     cmd = ["snakemake", "-s", snk_file, "-c", str(cores), "all"]
-
     merged_config = {}
 
     if config_file:
