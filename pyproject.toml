@@ -1,6 +1,6 @@
 [project]
 name = "viralQC"
-version = "0.12.0"
+version = "0.13.0"
 description = "A tool and package for quality control of consensus virus genomes."
 authors = [
     { name = "Filipe Zimmer Dezordi", email = "zimmer.filipe@gmail.com" }
