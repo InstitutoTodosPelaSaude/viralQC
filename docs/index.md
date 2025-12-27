@@ -33,6 +33,7 @@ adding-datasets
 output
 examples
 troubleshooting
+developer-guide
 ```
 
 ## Quick Links
