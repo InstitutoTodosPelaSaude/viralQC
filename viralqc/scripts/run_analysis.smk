@@ -390,6 +390,8 @@ rule extract_target_regions:
         f"{parameters.output_dir}/logs/extract_target_regions.log"
     shell:
         """
+        set -euo pipefail
+
         python {PKG_PATH}/scripts/python/extract_target_regions.py \
             --pp-results {input.post_processed_data} \
             --output-format {params.output_format} \
@@ -397,5 +399,5 @@ rule extract_target_regions:
 
         # Remove range values (:start-end) that seqtk subseq includes in the header.
         seqtk subseq {input.sequences} {output.target_regions_bed} | \
-            sed -e 's/\:[0-9]*-[0-9]*$//g' > {output.target_regions_sequences} 2>{log}
+            sed -e 's/\:[0-9]*-[0-9]*$//g' > {output.target_regions_sequences} 2>>{log}
         """
