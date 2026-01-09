@@ -1,5 +1,6 @@
-import argparse, json
+import argparse, json, gc
 from pathlib import Path
+from typing import Generator, Iterator
 from pandas import read_csv, concat, DataFrame
 from glob import glob
 from enum import Enum
@@ -9,6 +10,19 @@ class Separator(Enum):
     tsv = "\t"
     csv = ";"
     json = None
+
+
+# Columns required from post-process nextclade file with their dtypes
+REQUIRED_COLUMNS = {
+    "seqName": str,
+    "genomeQuality": str,
+    "targetRegionsQuality": str,
+    "targetGeneQuality": str,
+    "targetRegions": str,
+    "targetGene": str,
+}
+
+DEFAULT_CHUNK_SIZE = 10000
 
 
 def read_gffs(files: list[str]) -> DataFrame:
@@ -52,12 +66,172 @@ def read_gffs(files: list[str]) -> DataFrame:
     return df
 
 
+def read_pp_nextclade_chunks(
+    pp_results: Path, output_format: str, chunk_size: int = DEFAULT_CHUNK_SIZE
+) -> Generator[DataFrame, None, None]:
+    """
+    Read results from post process nextclade in chunks for memory efficiency.
+
+    Args:
+        pp_results: Path to post process nextclade output file
+        output_format: Format of the input file (csv, tsv, or json)
+        chunk_size: Number of rows to read per chunk
+
+    Yields:
+        DataFrame chunks from the post process nextclade output
+    """
+    sep = Separator[output_format].value
+
+    if not sep:
+        with open(pp_results) as f:
+            js = json.load(f)
+
+        df = DataFrame(js["data"])
+        del js
+        gc.collect()
+
+        available_cols = [col for col in REQUIRED_COLUMNS.keys() if col in df.columns]
+        df = df[available_cols]
+
+        for start in range(0, len(df), chunk_size):
+            chunk = df.iloc[start : start + chunk_size].copy()
+            yield chunk
+            del chunk
+            gc.collect()
+
+        del df
+        gc.collect()
+    else:
+        # CSV/TSV format - read in chunks using pandas chunksize
+        chunks = read_csv(
+            pp_results,
+            sep=sep,
+            header=0,
+            usecols=lambda col: col in REQUIRED_COLUMNS,
+            dtype=REQUIRED_COLUMNS,
+            chunksize=chunk_size,
+        )
+
+        for chunk in chunks:
+            yield chunk
+            del chunk
+            gc.collect()
+
+
+def get_region_interval(
+    seq: str, region: str, seq_to_gff: dict[str, DataFrame]
+) -> tuple | None:
+    """
+    Get the genomic interval for a single sequence and region.
+
+    Args:
+        seq: Sequence name
+        region: Target region string
+        seq_to_gff: Dictionary mapping sequence names to GFF dataframes
+
+    Returns:
+        Tuple of (start, end, region_name) or None if not found
+    """
+    if " " in seq:
+        seq_norm = seq.split()[0]
+    else:
+        seq_norm = seq
+
+    df_seq = seq_to_gff.get(seq_norm)
+    if df_seq is None:
+        return None
+
+    if isinstance(region, float):
+        return None
+
+    if region == "genome":
+        region_rows = df_seq[df_seq["feature"] == "region"]
+        if not region_rows.empty:
+            return (
+                region_rows["start"].values[0] - 1,
+                region_rows["end"].values[0],
+                "genome",
+            )
+    else:
+        genes = region.split("|")
+        gene_rows = df_seq[df_seq["feature"] == "gene"]
+        mask = gene_rows["attribute"].str.contains(
+            "|".join(f"gene_name={g}" for g in genes)
+        )
+        gene_rows = gene_rows[mask]
+
+        if not gene_rows.empty:
+            region_name = ",".join(genes)
+            return (
+                gene_rows["start"].min() - 1,
+                gene_rows["end"].max(),
+                region_name,
+            )
+
+    return None
+
+
+def process_and_write_bed(
+    chunks_iter: Iterator[DataFrame],
+    gff_info: DataFrame,
+    output_file: Path,
+) -> None:
+    """
+    Process chunks and write BED file incrementally without accumulating data in memory.
+
+    Args:
+        chunks_iter: Iterator yielding DataFrame chunks
+        gff_info: A dataframe that represents the GFF file
+        output_file: Output file path
+    """
+    seq_to_gff = {seq: df for seq, df in gff_info.groupby("seqname")}
+    written_sequences = set()
+
+    with output_file.open("w") as f:
+        for chunk in chunks_iter:
+            for _, row in chunk.iterrows():
+                seq_name = row["seqName"]
+
+                if seq_name in written_sequences:
+                    continue
+
+                genome_quality = row.get("genomeQuality", "")
+                target_regions_quality = row.get("targetRegionsQuality", "")
+                target_gene_quality = row.get("targetGeneQuality", "")
+
+                region = None
+                if genome_quality in ["A", "B"]:
+                    region = "genome"
+                elif target_regions_quality in ["A", "B"]:
+                    region = row.get("targetRegions", "")
+                elif target_gene_quality in ["A", "B"]:
+                    region = row.get("targetGene", "")
+
+                if region is None:
+                    continue
+
+                interval = get_region_interval(seq_name, region, seq_to_gff)
+                if interval is not None:
+                    start, end, region_name = interval
+                    f.write(f"{seq_name}\t{int(start)}\t{int(end)}\t{region_name}\n")
+                    written_sequences.add(seq_name)
+
+            # Cleanup after each chunk
+            del chunk
+            gc.collect()
+
+    del seq_to_gff, written_sequences
+    gc.collect()
+
+
+# Keep original functions for backwards compatibility
 def read_pp_nextclade(pp_results: Path, output_format: str) -> DataFrame:
     """
     Read results from post process nextclade independent of file format.
 
     Args:
         pp_results: Path to post process nextclade output file
+        output_format: Format of the input file
 
     Returns:
         A dataframe that represents the post process nextclade output
@@ -67,25 +241,22 @@ def read_pp_nextclade(pp_results: Path, output_format: str) -> DataFrame:
         with open(pp_results) as f:
             js = json.load(f)
         df = DataFrame(js["data"]).set_index("index")
+        available_cols = [col for col in REQUIRED_COLUMNS.keys() if col in df.columns]
+        df = df[available_cols]
     else:
-        df = read_csv(pp_results, sep=sep, header=0)
+        df = read_csv(
+            pp_results,
+            sep=sep,
+            header=0,
+            usecols=lambda col: col in REQUIRED_COLUMNS,
+            dtype=REQUIRED_COLUMNS,
+        )
     return df
 
 
 def check_target_regions(pp_results: DataFrame) -> dict:
     """
     Creates a dictionary mapping sequence names to target region names based on quality criteria.
-    If the genomeQuality is "A" or "B", the target region will be "genome"; otherwise, it will take
-    the value from the targetRegions or targetGene column.
-
-    Briefly, the logic prioritizes regions with good quality status in the following order:
-    genome > target regions > target genes.
-
-    Args:
-        pp_results: A DataFrame representing the post-processed Nextclade output.
-
-    Returns:
-        A dictionary with sequence names as keys and target region strings as values.
     """
     sequence_and_region = {}
     for _, row in pp_results.iterrows():
@@ -100,70 +271,20 @@ def check_target_regions(pp_results: DataFrame) -> dict:
 
 def get_regions(target_regions: dict, gff_info: DataFrame) -> dict:
     """
-    Creates a dictionary with sequence name and target genomic positions. This function
-    map the information presents on target regions dictionary with the information on a
-    genomic features file (GFF) to create intervals of each region.
-
-    Briefly, the logic look for start and end of gene features if the target region is
-    a gene or a set of genes, or the start and end of the genome itsfel (feature = region)
-    if the target region is the complete genome. 1 Is subtracted from start to produce a
-    0-based bed.
-
-    Args:
-        target_regions: A dictionary with sequence name as key, and target regions as values.
-        gff_info: A dataframe that represents the GFF file.
-    Returns:
-        A dictionary with sequence names as keys and a tuple containing the start and end positions
-        of target regions and the region name.
+    Creates a dictionary with sequence name and target genomic positions.
     """
     sequences_intervals = {}
     seq_to_gff = {seq: df for seq, df in gff_info.groupby("seqname")}
     for seq, region in target_regions.items():
-        if " " in seq:
-            seq_norm = seq.split()[0]
-        else:
-            seq_norm = seq
-        df_seq = seq_to_gff.get(seq_norm)
-        if df_seq is None:
-            continue
-        if type(region) == float:
-            continue
-
-        if region == "genome":
-            region_rows = df_seq[df_seq["feature"] == "region"]
-            if not region_rows.empty:
-                sequences_intervals[seq] = (
-                    region_rows["start"].values[0] - 1,
-                    region_rows["end"].values[0],
-                    "genome",
-                )
-        else:
-            genes = region.split("|")
-            gene_rows = df_seq[df_seq["feature"] == "gene"]
-            mask = gene_rows["attribute"].str.contains(
-                "|".join(f"gene_name={g}" for g in genes)
-            )
-            gene_rows = gene_rows[mask]
-
-            if not gene_rows.empty:
-                # Convert genes list to comma-separated string
-                region_name = ",".join(genes)
-                sequences_intervals[seq] = (
-                    gene_rows["start"].min() - 1,
-                    gene_rows["end"].max(),
-                    region_name,
-                )
+        interval = get_region_interval(seq, region, seq_to_gff)
+        if interval is not None:
+            sequences_intervals[seq] = interval
     return sequences_intervals
 
 
 def write_bed(sequences_intervals: dict, output_file: Path) -> None:
     """
     Writes the target regions intervals to a bed file with region names.
-
-    Args:
-        sequences_intervals: A dictionary with sequence names as keys and a tuple
-        containing the start and end positions and region name of target regions.
-        output_file: Output file path.
     """
     with output_file.open("w") as f:
         for seqname, (start, end, region_name) in sequences_intervals.items():
@@ -193,11 +314,21 @@ if __name__ == "__main__":
         required=True,
         help="Output file name.",
     )
+    parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=DEFAULT_CHUNK_SIZE,
+        help="Number of rows to process at a time (default: 10000).",
+    )
     args = parser.parse_args()
 
     files = glob(f"{args.pp_results.parent}/gff_files/*.gff")
     gff = read_gffs(files)
-    pp_nextclade = read_pp_nextclade(args.pp_results, args.output_format)
-    target_regions = check_target_regions(pp_nextclade)
-    target_regions_intervals = get_regions(target_regions, gff)
-    write_bed(target_regions_intervals, args.output)
+
+    pp_chunks = read_pp_nextclade_chunks(
+        args.pp_results, args.output_format, args.chunk_size
+    )
+    process_and_write_bed(pp_chunks, gff, args.output)
+
+    del gff
+    gc.collect()

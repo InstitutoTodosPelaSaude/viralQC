@@ -152,14 +152,18 @@ checkpoint select_datasets_from_nextclade:
         unmapped_sequences = f"{parameters.output_dir}/identified_datasets/unmapped_sequences.txt"
     threads:
         parameters.threads
+    log:
+        f"{parameters.output_dir}/logs/format_nextclade_sort.log"
     shell:
         """
+        set -euo pipefail
+
         python {PKG_PATH}/scripts/python/format_nextclade_sort.py \
             --nextclade-output {input.viruses_identified} \
             --nextclade-external-output {input.viruses_identified_external} \
             --config-file {input.config_file} \
             --local-datasets-path {params.datasets_local_path}/ \
-            --output-path {params.output_dir}/identified_datasets 
+            --output-path {params.output_dir}/identified_datasets 2>>{log}
         """
 
 
@@ -184,9 +188,11 @@ rule blast:
         f"{parameters.output_dir}/logs/blast.log"
     shell:
         """
-        mkdir -p {params.output_dir}/blast_results
+        set -euo pipefail
+
+        mkdir -p {params.output_dir}/blast_results 2>>{log}
         if [ -s {input.unmapped_sequences} ]; then
-            seqtk subseq {input.sequences} {input.unmapped_sequences} > {params.output_dir}/blast_results/unmapped_sequences.fasta
+            seqtk subseq {input.sequences} {input.unmapped_sequences} > {params.output_dir}/blast_results/unmapped_sequences.fasta 2>>{log}
 
             python {PKG_PATH}/scripts/python/blast_wrapper.py \
                 --input {params.output_dir}/blast_results/unmapped_sequences.fasta \
@@ -197,9 +203,9 @@ rule blast:
                 --qcov {params.blast_qcov} \
                 --perc_identity {params.identity_threshold} \
                 --threads {threads} \
-                --outfmt "6 qseqid qlen sseqid slen qstart qend sstart send evalue bitscore pident qcovs qcovhsp" 2> {log}
+                --outfmt "6 qseqid qlen sseqid slen qstart qend sstart send evalue bitscore pident qcovs qcovhsp" 2>>{log}
 
-            rm {params.output_dir}/blast_results/unmapped_sequences.fasta
+            rm {params.output_dir}/blast_results/unmapped_sequences.fasta 2>>{log}
         else
             touch {output.viruses_identified}
         fi
@@ -245,6 +251,8 @@ rule nextclade:
         f"{parameters.output_dir}/logs/nextclade.{{virus}}.log"
     shell:
         """
+        set -euo pipefail
+
         nextclade run \
             --input-dataset {input.dataset} \
             --output-tsv {output.nextclade_tsv}.tmp \
@@ -257,7 +265,7 @@ rule nextclade:
         python {PKG_PATH}/scripts/python/reorder_cds.py \
             --nextclade-tsv {output.nextclade_tsv}.tmp \
             --gff {input.dataset}/genome_annotation.gff3 \
-            --output {output.nextclade_tsv}
+            --output {output.nextclade_tsv} 2>>{log}
 
         rm {output.nextclade_tsv}.tmp
         """
@@ -300,13 +308,15 @@ rule run_generic_nextclade:
         f"{parameters.output_dir}/logs/generic_nextclade.{{virus}}.log"
     shell:
         """
+        set -euo pipefail
+
         # Get sequences for this virus from blast results
-        grep "{wildcards.virus}" {input.blast_results} | cut -f 1 > {params.output_dir}/blast_results/{wildcards.virus}.ids
-        seqtk subseq {input.sequences} {params.output_dir}/blast_results/{wildcards.virus}.ids > {params.output_dir}/blast_results/{wildcards.virus}.fasta
+        grep "{wildcards.virus}" {input.blast_results} | cut -f 1 > {params.output_dir}/blast_results/{wildcards.virus}.ids 2>>{log}
+        seqtk subseq {input.sequences} {params.output_dir}/blast_results/{wildcards.virus}.ids > {params.output_dir}/blast_results/{wildcards.virus}.fasta 2>>{log}
 
         # Get reference sequence from blast db
-        echo "{wildcards.virus}" > {params.output_dir}/blast_results/{wildcards.virus}.ref.id
-        seqtk subseq {input.blast_database} {params.output_dir}/blast_results/{wildcards.virus}.ref.id > {params.output_dir}/blast_results/{wildcards.virus}.ref.fasta
+        echo "{wildcards.virus}" > {params.output_dir}/blast_results/{wildcards.virus}.ref.id 2>>{log}
+        seqtk subseq {input.blast_database} {params.output_dir}/blast_results/{wildcards.virus}.ref.id > {params.output_dir}/blast_results/{wildcards.virus}.ref.fasta 2>>{log}
 
         # Check if GFF exists
         GFF_FILE="{params.datasets_dir}/blast_gff/{wildcards.virus}.gff"
@@ -326,7 +336,7 @@ rule run_generic_nextclade:
             python {PKG_PATH}/scripts/python/reorder_cds.py \
                 --nextclade-tsv {output.nextclade_tsv}.tmp \
                 --gff "$GFF_FILE" \
-                --output {output.nextclade_tsv}
+                --output {output.nextclade_tsv} 2>>{log}
 
             rm {output.nextclade_tsv}.tmp
         else
@@ -362,6 +372,8 @@ rule post_process_nextclade:
         f"{parameters.output_dir}/logs/pp_nextclade.log"
     shell:
         """
+        set -euo pipefail
+
         python {PKG_PATH}/scripts/python/post_process_nextclade.py \
             --files {input.nextclade_results} \
             --generic-files {input.generic_nextclade_results} \
