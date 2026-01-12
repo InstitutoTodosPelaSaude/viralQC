@@ -1,7 +1,7 @@
 nextclade_data:
   denv1:
     dataset: "community/v-gen-lab/dengue/denv1"
-    tag: "2025-04-02--19-11-08Z"
+    tag: "2025-09-09--12-13-13Z"
     virus_name: "Dengue virus type 1"
     virus_tax_id: 11053
     virus_species: "Orthoflavivirus denguei"
@@ -13,7 +13,7 @@ nextclade_data:
     private_mutation_total_threshold: 70
   denv2:
     dataset: "community/v-gen-lab/dengue/denv2"
-    tag: "2025-03-26--11-47-13Z"
+    tag: "2025-09-09--12-13-13Z"
     virus_name: "Dengue virus type 2"
     virus_tax_id: 11060
     virus_species: "Orthoflavivirus denguei"
@@ -25,7 +25,7 @@ nextclade_data:
     private_mutation_total_threshold: 105
   denv3:
     dataset: "community/v-gen-lab/dengue/denv3"
-    tag: "2025-03-26--11-47-13Z"
+    tag: "2025-09-09--12-13-13Z"
     virus_name: "Dengue virus type 3"
     virus_tax_id: 11069
     virus_species: "Orthoflavivirus denguei"
@@ -37,7 +37,7 @@ nextclade_data:
     private_mutation_total_threshold: 65
   denv4:
     dataset: "community/v-gen-lab/dengue/denv4"
-    tag: "2025-03-26--11-47-13Z"
+    tag: "2025-09-09--12-13-13Z"
     virus_name: "Dengue virus type 4"
     virus_tax_id: 11070
     virus_species: "Orthoflavivirus denguei"
@@ -49,7 +49,7 @@ nextclade_data:
     private_mutation_total_threshold: 75
   sarscov2-wuhan:
     dataset: "nextstrain/sars-cov-2/wuhan-hu-1/orfs"
-    tag: "2025-06-09--15-42-38Z"
+    tag: "2026-01-06--14-59-32Z"
     virus_name: "SARS-CoV-2"
     virus_tax_id: 2697049
     virus_species: "Betacoronavirus pandemicum"
@@ -60,7 +60,7 @@ nextclade_data:
     target_regions: ["ORF1a", "ORF1b", "S"]
   sarscov2-ba:
     dataset: "nextstrain/sars-cov-2/BA.2.86"
-    tag: "2025-06-09--15-42-38Z"
+    tag: "2026-01-06--14-59-32Z"
     virus_name: "SARS-CoV-2"
     virus_tax_id: 2697049
     virus_species: "Betacoronavirus pandemicum"
@@ -71,7 +71,7 @@ nextclade_data:
     target_regions: ["ORF1a", "ORF1b", "S"]
   rsva:
     dataset: "nextstrain/rsv/a/EPI_ISL_412866"
-    tag: "2024-11-27--02-51-00Z"
+    tag: "2025-09-09--12-13-13Z"
     virus_name: "Respiratory syncytial virus A"
     virus_tax_id: 208893
     virus_species: "Orthopneumovirus hominis"
@@ -83,7 +83,7 @@ nextclade_data:
     private_mutation_total_threshold: 80
   rsvb:
     dataset: "nextstrain/rsv/b/EPI_ISL_1653999"
-    tag: "2025-03-04--17-31-25Z"
+    tag: "2025-09-09--12-13-13Z"
     virus_name: "Respiratory syncytial virus B"
     virus_tax_id: 208895
     virus_species: "Orthopneumovirus hominis"
@@ -95,7 +95,7 @@ nextclade_data:
     private_mutation_total_threshold: 50
   flu-h1n1-ha-CY121680:
     dataset: "nextstrain/flu/h1n1pdm/ha/CY121680"
-    tag: "2025-09-09--12-13-13Z"
+    tag: "2025-12-02--12-30-02Z"
     virus_name: "Influenza A H1N1"
     virus_tax_id: 11320
     virus_species: "Alphainfluenzavirus influenzae"
@@ -107,7 +107,7 @@ nextclade_data:
     private_mutation_total_threshold: 10
   flu-h1n1-ha-MW626062:
     dataset: "nextstrain/flu/h1n1pdm/ha/MW626062"
-    tag: "2025-09-09--12-13-13Z"
+    tag: "2025-12-02--12-30-02Z"
     virus_name: "Influenza A H1N1"
     virus_tax_id: 11320
     virus_species: "Alphainfluenzavirus influenzae"
@@ -197,7 +197,7 @@ nextclade_data:
     target_regions: ["PB2"]
   flu-h3n2-ha-CY163680:
     dataset: "nextstrain/flu/h3n2/ha/CY163680"
-    tag: "2025-09-09--12-13-13Z"
+    tag: "2025-11-04--15-46-13Z"
     virus_name: "Influenza A H3N2"
     virus_tax_id: 11320
     virus_species: "Alphainfluenzavirus influenzae"
@@ -209,7 +209,7 @@ nextclade_data:
     private_mutation_total_threshold: 10
   flu-h3n2-ha-EPI1857216:
     dataset: "nextstrain/flu/h3n2/ha/EPI1857216"
-    tag: "2025-09-09--12-13-13Z"
+    tag: "2025-11-04--15-46-13Z"
     virus_name: "Influenza A H3N2"
     virus_tax_id: 11320
     virus_species: "Alphainfluenzavirus influenzae"
@@ -299,7 +299,7 @@ nextclade_data:
     target_regions: ["PB2"]
   flu-vic-ha:
     dataset: "nextstrain/flu/vic/ha/KX058884"
-    tag: "2025-09-09--12-13-13Z"
+    tag: "2025-10-22--18-11-36Z"
     virus_name: "Influenza B"
     virus_tax_id: 11520
     virus_species: "Betainfluenzavirus influenzae"
