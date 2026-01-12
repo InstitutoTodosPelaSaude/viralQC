@@ -762,9 +762,9 @@ def format_dfs(
 
         if not df.empty:
             virus_dataset = _extract_dataset_name(file)
-            virus_info = config["nextclade_data"].get(
-                virus_dataset, config["github"].get(virus_dataset)
-            )
+            virus_info = config["nextclade_data"].get(virus_dataset)
+            if virus_info is None and "github" in config:
+                virus_info = config["github"].get(virus_dataset)
 
             if virus_info:
                 _process_with_virus_info(df, virus_dataset, virus_info)

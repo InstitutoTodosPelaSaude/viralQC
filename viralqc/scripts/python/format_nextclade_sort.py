@@ -25,7 +25,7 @@ def map_datasets_to_local_paths(
         remote_name = info.get("dataset")
         if remote_name:
             mapping[remote_name] = datasets_path / name
-    for name, info in config["github"].items():
+    for name, info in config.get("github", {}).items():
         mapping[name] = datasets_path / name
     return mapping
 

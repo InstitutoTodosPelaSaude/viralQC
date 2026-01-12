@@ -85,12 +85,12 @@ rule nextclade_sort:
     message:
         "Run nextclade sort to identify datasets"
     input:
-        sequences = parameters.sequences_fasta,
-        external_datasets_minimizers = parameters.external_datasets_minimizers
+        sequences = parameters.sequences_fasta
     params:
         output_dir = parameters.output_dir,
         min_score = parameters.nextclade_sort_min_score,
-        min_hits = parameters.nextclade_sort_min_hits
+        min_hits = parameters.nextclade_sort_min_hits,
+        external_datasets_minimizers = parameters.external_datasets_minimizers
     output:
         viruses_identified =  f"{parameters.output_dir}/identified_datasets/viruses.tsv",
         viruses_identified_external =  f"{parameters.output_dir}/identified_datasets/viruses.external_datasets.tsv"
@@ -113,24 +113,28 @@ rule nextclade_sort:
             --jobs {threads} 2>>{log}
 
         # Run nextclade sort again using only sequences that were not mapped in the datasets from nextclade_data
+        # This only runs if external_datasets_minimizers.json exists (i.e., github datasets are configured)
         awk -F"\\t" '{{if ($3 == "") print $2}}' \
             {output.viruses_identified} > \
-            {params.output_dir}/identified_datasets/tmp_unmapped_sequences.txt 2>>{log} 
+            {params.output_dir}/identified_datasets/tmp_unmapped_sequences.txt 2>>{log}
 
-        if [ -s {params.output_dir}/identified_datasets/tmp_unmapped_sequences.txt ]; then
+        if [ -f "{params.external_datasets_minimizers}" ] && [ -s {params.output_dir}/identified_datasets/tmp_unmapped_sequences.txt ]; then
             seqtk subseq {input.sequences} {params.output_dir}/identified_datasets/tmp_unmapped_sequences.txt > \
                 {params.output_dir}/identified_datasets/tmp_unmapped_sequences.fasta 2>>{log}
-        fi
 
-        if [ -s {params.output_dir}/identified_datasets/tmp_unmapped_sequences.fasta ]; then
-            nextclade sort {params.output_dir}/identified_datasets/tmp_unmapped_sequences.fasta \
-                --input-minimizer-index-json {input.external_datasets_minimizers} \
-                --output-path '{params.output_dir}/identified_datasets/{{name}}/sequences.fa' \
-                --output-results-tsv {output.viruses_identified_external} \
-                --min-score {params.min_score} \
-                --min-hits {params.min_hits} \
-                --jobs {threads} 2>>{log}
+            if [ -s {params.output_dir}/identified_datasets/tmp_unmapped_sequences.fasta ]; then
+                nextclade sort {params.output_dir}/identified_datasets/tmp_unmapped_sequences.fasta \
+                    --input-minimizer-index-json {params.external_datasets_minimizers} \
+                    --output-path '{params.output_dir}/identified_datasets/{{name}}/sequences.fa' \
+                    --output-results-tsv {output.viruses_identified_external} \
+                    --min-score {params.min_score} \
+                    --min-hits {params.min_hits} \
+                    --jobs {threads} 2>>{log}
+            else
+                echo -e "seqName\tdataset\tscore\tnumHits" > {output.viruses_identified_external} 2>>{log}
+            fi
         else
+            # No external datasets configured or no unmapped sequences
             echo -e "seqName\tdataset\tscore\tnumHits" > {output.viruses_identified_external} 2>>{log}
         fi
 
