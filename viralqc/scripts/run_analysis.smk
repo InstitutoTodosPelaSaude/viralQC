@@ -50,7 +50,7 @@ rule itemize_sequences:
     input:
         sequences = parameters.sequences_fasta
     output:
-        fasta = temp(f"{parameters.output_dir}/sequences_sanitized.fasta"),
+        fasta = f"{parameters.output_dir}/sequences_sanitized.fasta",
         mapping = f"{parameters.output_dir}/identified_datasets/id_mapping.tsv"
     shell:
         """
