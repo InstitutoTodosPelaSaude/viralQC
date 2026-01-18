@@ -22,34 +22,25 @@ def parse_args():
 def main():
     args = parse_args()
 
-    mapping = []
-    sequences = []
-
     try:
-        with open(args.input, "r") as handle:
-            for i, record in enumerate(SeqIO.parse(handle, "fasta"), 1):
-                original_id = record.description
-                new_id = str(i)
+        with open(args.output_fasta, "w") as output_handle, \
+             open(args.output_mapping, "w", newline="") as map_handle:
 
-                mapping.append({"id": new_id, "original_header": original_id})
-
-                record.id = new_id
-                record.description = ""
-                sequences.append(record)
-
-        if sequences:
-            with open(args.output_fasta, "w") as output_handle:
-                SeqIO.write(sequences, output_handle, "fasta")
-        else:
-            open(args.output_fasta, "a").close()
-
-        with open(args.output_mapping, "w", newline="") as tsvfile:
             writer = csv.DictWriter(
-                tsvfile, fieldnames=["id", "original_header"], delimiter="\t"
+                map_handle, fieldnames=["id", "original_header"], delimiter="\t"
             )
             writer.writeheader()
-            for row in mapping:
-                writer.writerow(row)
+
+            with open(args.input, "r") as input_handle:
+                for i, record in enumerate(SeqIO.parse(input_handle, "fasta"), 1):
+                    original_id = record.description
+                    new_id = str(i)
+
+                    writer.writerow({"id": new_id, "original_header": original_id})
+
+                    record.id = new_id
+                    record.description = ""
+                    SeqIO.write(record, output_handle, "fasta")
 
     except Exception as e:
         print(f"Error processing sequences: {e}", file=sys.stderr)
