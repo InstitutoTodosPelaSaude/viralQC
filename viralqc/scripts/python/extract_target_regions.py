@@ -12,6 +12,19 @@ class Separator(Enum):
     json = None
 
 
+def load_id_mapping(mapping_path: Path) -> dict:
+    """
+    Load the ID mapping TSV file. Returns a dict mapping Original Header -> Sanitized ID.
+    """
+    mapping = {}
+    try:
+        with open(mapping_path, "r") as f:
+            reader = read_csv(f, sep="\t", dtype=str)
+            return dict(zip(reader["original_header"], reader["id"]))
+    except Exception:
+        return {}
+
+
 # Columns required from post-process nextclade file with their dtypes
 REQUIRED_COLUMNS = {
     "seqName": str,
@@ -58,6 +71,7 @@ def read_gffs(files: list[str]) -> DataFrame:
                 comment="#",
                 names=column_names,
                 header=None,
+                dtype={"seqname": str},
             )
             for f in files
         ),
@@ -102,7 +116,6 @@ def read_pp_nextclade_chunks(
         del df
         gc.collect()
     else:
-        # CSV/TSV format - read in chunks using pandas chunksize
         chunks = read_csv(
             pp_results,
             sep=sep,
@@ -171,10 +184,19 @@ def get_region_interval(
     return None
 
 
+def get_sanitized_id(seq_name: str, id_map: dict) -> str:
+    """
+    Get the sanitized ID for a sequence name.
+    If not in map, return original (fallback).
+    """
+    return id_map.get(seq_name, seq_name)
+
+
 def process_and_write_bed(
     chunks_iter: Iterator[DataFrame],
     gff_info: DataFrame,
     output_file: Path,
+    id_map: dict,
 ) -> None:
     """
     Process chunks and write BED file incrementally without accumulating data in memory.
@@ -183,6 +205,7 @@ def process_and_write_bed(
         chunks_iter: Iterator yielding DataFrame chunks
         gff_info: A dataframe that represents the GFF file
         output_file: Output file path
+        id_map: Dictionary mapping Original Header -> Sanitized ID
     """
     seq_to_gff = {seq: df for seq, df in gff_info.groupby("seqname")}
     written_sequences = set()
@@ -194,6 +217,10 @@ def process_and_write_bed(
 
                 if seq_name in written_sequences:
                     continue
+
+                sanitized_id = (
+                    get_sanitized_id(seq_name, id_map) if id_map else seq_name
+                )
 
                 genome_quality = row.get("genomeQuality", "")
                 target_regions_quality = row.get("targetRegionsQuality", "")
@@ -210,13 +237,13 @@ def process_and_write_bed(
                 if region is None:
                     continue
 
-                interval = get_region_interval(seq_name, region, seq_to_gff)
+                interval = get_region_interval(sanitized_id, region, seq_to_gff)
+
                 if interval is not None:
                     start, end, region_name = interval
                     f.write(f"{seq_name}\t{int(start)}\t{int(end)}\t{region_name}\n")
                     written_sequences.add(seq_name)
 
-            # Cleanup after each chunk
             del chunk
             gc.collect()
 
@@ -320,15 +347,23 @@ if __name__ == "__main__":
         default=DEFAULT_CHUNK_SIZE,
         help="Number of rows to process at a time (default: 10000).",
     )
+    parser.add_argument(
+        "--id-mapping",
+        type=Path,
+        required=False,
+        help="Path to the ID mapping TSV file.",
+    )
     args = parser.parse_args()
 
     files = glob(f"{args.pp_results.parent}/gff_files/*.gff")
     gff = read_gffs(files)
 
+    id_map = load_id_mapping(args.id_mapping) if args.id_mapping else {}
+
     pp_chunks = read_pp_nextclade_chunks(
         args.pp_results, args.output_format, args.chunk_size
     )
-    process_and_write_bed(pp_chunks, gff, args.output)
+    process_and_write_bed(pp_chunks, gff, args.output, id_map)
 
     del gff
     gc.collect()

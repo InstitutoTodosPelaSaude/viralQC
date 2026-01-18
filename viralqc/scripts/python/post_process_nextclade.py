@@ -129,6 +129,23 @@ def load_blast_metadata(metadata_path: Path) -> DataFrame:
         return DataFrame(columns=list(column_mapping.values()))
 
 
+def load_id_mapping(mapping_path: Path) -> dict:
+    """
+    Load the ID mapping TSV file.
+
+    Args:
+        mapping_path: Path to the mapping file.
+
+    Returns:
+        Dictionary mapping sanitized ID to original header.
+    """
+    try:
+        df = read_csv(mapping_path, sep="\t", dtype=str)
+        return dict(zip(df["id"], df["original_header"]))
+    except Exception:
+        return {}
+
+
 def format_sc2_clade(df: DataFrame, dataset_name: str) -> DataFrame:
     """
     For SARS-CoV-2 datasets, replace 'clade' with 'Nextclade_pango'.
@@ -912,6 +929,25 @@ def _sanitize_dataframe(df: DataFrame) -> DataFrame:
     return final_df
 
 
+def _map_ids(df: DataFrame, id_map: dict) -> DataFrame:
+    """
+    Restore original IDs using the mapping dictionary.
+    Modifies DataFrame in-place.
+
+    Args:
+        df: DataFrame to process.
+        id_map: Dictionary mapping sanitized ID to original header.
+
+    Returns:
+        DataFrame with restored IDs.
+    """
+    if id_map and "seqName" in df.columns:
+        # Convert seqName to string to ensure matching works
+        df["seqName"] = df["seqName"].astype(str)
+        df["seqName"] = df["seqName"].map(id_map).fillna(df["seqName"])
+    return df
+
+
 def _filter_unmapped_sequences(
     unmapped_df: DataFrame, processed_seq_names: set
 ) -> DataFrame:
@@ -996,6 +1032,7 @@ def _write_json_output(
     unmapped_df: DataFrame,
     processed_seq_names: set,
     output_file: Path,
+    id_map: dict = None,
 ) -> None:
     """
     Write all dataframes to JSON output file.
@@ -1005,10 +1042,13 @@ def _write_json_output(
         unmapped_df: Optional unmapped sequences dataframe.
         processed_seq_names: Set of already processed sequence names.
         output_file: Path to output file.
+        id_map: Dictionary for ID mapping.
     """
     all_data = []
 
     for df in df_iterator:
+        if id_map:
+            df = _map_ids(df, id_map)
         final_df = _sanitize_dataframe(df)
         all_data.append(final_df)
         del df, final_df
@@ -1017,6 +1057,8 @@ def _write_json_output(
     if unmapped_df is not None and not unmapped_df.empty:
         unmapped_df = _filter_unmapped_sequences(unmapped_df, processed_seq_names)
         if not unmapped_df.empty:
+            if id_map:
+                unmapped_df = _map_ids(unmapped_df, id_map)
             final_unmapped = _sanitize_dataframe(unmapped_df)
             all_data.append(final_unmapped)
 
@@ -1080,6 +1122,7 @@ def _write_csv_tsv_output(
     processed_seq_names: set,
     output_file: Path,
     output_format: str,
+    id_map: dict = None,
 ) -> None:
     """
     Write all dataframes to CSV/TSV output file incrementally.
@@ -1094,6 +1137,8 @@ def _write_csv_tsv_output(
     first_chunk = True
 
     for df in df_iterator:
+        if id_map:
+            df = _map_ids(df, id_map)
         final_df = _sanitize_dataframe(df)
         _write_csv_tsv_chunk(
             final_df, output_file, output_format, first_chunk, first_chunk
@@ -1105,6 +1150,8 @@ def _write_csv_tsv_output(
     if unmapped_df is not None and not unmapped_df.empty:
         unmapped_df = _filter_unmapped_sequences(unmapped_df, processed_seq_names)
         if not unmapped_df.empty:
+            if id_map:
+                unmapped_df = _map_ids(unmapped_df, id_map)
             final_unmapped = _sanitize_dataframe(unmapped_df)
             _write_csv_tsv_chunk(
                 final_unmapped, output_file, output_format, False, False
@@ -1119,6 +1166,7 @@ def write_combined_df(
     output_format: str,
     unmapped_df: DataFrame = None,
     processed_seq_names: set = None,
+    id_map: dict = None,
 ) -> None:
     """
     Write dataframes incrementally to reduce memory usage.
@@ -1131,10 +1179,17 @@ def write_combined_df(
         processed_seq_names: Set of sequence names already processed.
     """
     if output_format == "json":
-        _write_json_output(df_iterator, unmapped_df, processed_seq_names, output_file)
+        _write_json_output(
+            df_iterator, unmapped_df, processed_seq_names, output_file, id_map
+        )
     else:
         _write_csv_tsv_output(
-            df_iterator, unmapped_df, processed_seq_names, output_file, output_format
+            df_iterator,
+            unmapped_df,
+            processed_seq_names,
+            output_file,
+            output_format,
+            id_map,
         )
 
 
@@ -1175,6 +1230,12 @@ if __name__ == "__main__":
         help="Path to blast database metadata tsv file.",
     ),
     parser.add_argument(
+        "--id-mapping",
+        type=Path,
+        required=False,
+        help="Path to the ID mapping TSV file.",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         required=True,
@@ -1199,6 +1260,8 @@ if __name__ == "__main__":
         args.unmapped_sequences, args.blast_results, blast_metadata_df
     )
 
+    id_map = load_id_mapping(args.id_mapping) if args.id_mapping else {}
+
     # Organize sequences and results from Nextclade
     processed_seq_names = set()
     all_dfs = []
@@ -1215,4 +1278,5 @@ if __name__ == "__main__":
         args.output_format,
         unmapped_df=unmapped_df,
         processed_seq_names=processed_seq_names,
+        id_map=id_map,
     )

@@ -44,6 +44,22 @@ rule parameters:
 parameters = rules.parameters.params
 
 
+rule itemize_sequences:
+    message:
+        "Renaming sequences to sequential IDs"
+    input:
+        sequences = parameters.sequences_fasta
+    output:
+        fasta = temp(f"{parameters.output_dir}/sequences_sanitized.fasta"),
+        mapping = f"{parameters.output_dir}/identified_datasets/id_mapping.tsv"
+    shell:
+        """
+        python {PKG_PATH}/scripts/python/itemize_sequences.py \
+            --input {input.sequences} \
+            --output-fasta {output.fasta} \
+            --output-mapping {output.mapping}
+        """
+
 _run_counters = {}
 def get_nextclade_outputs(wildcards):
     output_dir = parameters.output_dir
@@ -85,7 +101,7 @@ rule nextclade_sort:
     message:
         "Run nextclade sort to identify datasets"
     input:
-        sequences = parameters.sequences_fasta
+        sequences = rules.itemize_sequences.output.fasta
     params:
         output_dir = parameters.output_dir,
         min_score = parameters.nextclade_sort_min_score,
@@ -175,7 +191,7 @@ rule blast:
     message:
         "Run BLAST for unmapped sequences"
     input:
-        sequences = parameters.sequences_fasta,
+        sequences = rules.itemize_sequences.output.fasta,
         unmapped_sequences = rules.select_datasets_from_nextclade.output.unmapped_sequences,
         blast_database = parameters.blast_database
     params:
@@ -198,16 +214,18 @@ rule blast:
         if [ -s {input.unmapped_sequences} ]; then
             seqtk subseq {input.sequences} {input.unmapped_sequences} > {params.output_dir}/blast_results/unmapped_sequences.fasta 2>>{log}
 
-            python {PKG_PATH}/scripts/python/blast_wrapper.py \
-                --input {params.output_dir}/blast_results/unmapped_sequences.fasta \
-                --db {input.blast_database} \
-                --output {output.viruses_identified} \
-                --task {params.blast_task} \
-                --evalue {params.blast_evalue} \
-                --qcov {params.blast_qcov} \
-                --perc_identity {params.identity_threshold} \
-                --threads {threads} \
-                --outfmt "6 qseqid qlen sseqid slen qstart qend sstart send evalue bitscore pident qcovs qcovhsp" 2>>{log}
+            blastn \
+                -query {params.output_dir}/blast_results/unmapped_sequences.fasta \
+                -db {input.blast_database} \
+                -out {output.viruses_identified} \
+                -task {params.blast_task} \
+                -evalue {params.blast_evalue} \
+                -qcov_hsp_perc {params.blast_qcov} \
+                -perc_identity {params.identity_threshold} \
+                -num_threads {threads} \
+                -outfmt "6 qseqid qlen sseqid slen qstart qend sstart send evalue bitscore pident qcovs qcovhsp" \
+                -max_hsps 1 \
+                -max_target_seqs 1 2>>{log}
 
             rm {params.output_dir}/blast_results/unmapped_sequences.fasta 2>>{log}
         else
@@ -297,7 +315,7 @@ rule run_generic_nextclade:
     message:
         "Run generic nextclade for blast identified virus {wildcards.virus}"
     input:
-        sequences = parameters.sequences_fasta,
+        sequences = rules.itemize_sequences.output.fasta,
         blast_results = rules.blast.output.viruses_identified,
         blast_database = parameters.blast_database
     params:
@@ -367,7 +385,8 @@ rule post_process_nextclade:
         blast_results = rules.blast.output.viruses_identified,
         unmapped_sequences = f"{parameters.output_dir}/identified_datasets/unmapped_sequences.txt",
         config_file = parameters.config_file,
-        blast_database_metadata = {parameters.blast_database_metadata}
+        blast_database_metadata = {parameters.blast_database_metadata},
+        id_mapping = rules.itemize_sequences.output.mapping
     params:
         output_format = parameters.output_format
     output:
@@ -384,6 +403,7 @@ rule post_process_nextclade:
             --unmapped-sequences {input.unmapped_sequences} \
             --blast-results {input.blast_results} \
             --blast-metadata {input.blast_database_metadata} \
+            --id-mapping {input.id_mapping} \
             --config-file {input.config_file} \
             --output {output.output_file} \
             --output-format {params.output_format} 2>{log}
@@ -394,7 +414,8 @@ rule extract_target_regions:
         "Extracts the regions marked as good"
     input:
         sequences = parameters.sequences_fasta,
-        post_processed_data = rules.post_process_nextclade.output.output_file
+        post_processed_data = rules.post_process_nextclade.output.output_file,
+        id_mapping = rules.itemize_sequences.output.mapping
     params:
         output_format = parameters.output_format
     output:
@@ -411,6 +432,7 @@ rule extract_target_regions:
         python {PKG_PATH}/scripts/python/extract_target_regions.py \
             --pp-results {input.post_processed_data} \
             --output-format {params.output_format} \
+            --id-mapping {input.id_mapping} \
             --output {output.target_regions_bed} 2>{log}
 
         # Remove range values (:start-end) that seqtk subseq includes in the header.
