@@ -258,6 +258,26 @@ def get_fasta_for_virus(wildcards):
 def get_dataset_for_virus(wildcards):
     return get_virus_info(wildcards, 'localDataset')
 
+
+
+def get_nextclade_threads(wildcards):
+    try:
+        datasets_selected_file = checkpoints.select_datasets_from_nextclade.get().output.datasets_selected
+        viruses = set()
+        with open(datasets_selected_file, 'r') as f:
+            reader = csv.DictReader(f, delimiter='\t')
+            for row in reader:
+                if row.get('localDataset', None):
+                    viruses.add(row.get('localDataset'))
+        
+        count = len(viruses)
+        if count == 0:
+            return 1
+        return max(1, int(parameters.threads / count))
+    except Exception:
+        return 1
+
+
 rule nextclade:
     message:
         "Run nextclade for virus {wildcards.virus}"
@@ -268,7 +288,7 @@ rule nextclade:
         nextclade_tsv = f"{parameters.output_dir}/nextclade_results/{{virus}}.nextclade.tsv",
         nextclade_gff = f"{parameters.output_dir}/gff_files/{{virus}}.nextclade.gff"
     threads:
-        parameters.threads
+        get_nextclade_threads
     log:
         f"{parameters.output_dir}/logs/nextclade.{{virus}}.log"
     shell:
@@ -311,6 +331,21 @@ def get_generic_nextclade_outputs(wildcards):
 
     return [f"{parameters.output_dir}/nextclade_results/{virus}.generic.nextclade.tsv" for virus in blast_viruses]
 
+def get_generic_nextclade_threads(wildcards):
+    try:
+        blast_viruses_list = checkpoints.process_blast_results.get().output.blast_viruses_list
+        count = 0
+        if os.path.exists(blast_viruses_list):
+            with open(blast_viruses_list, 'r') as f:
+                 count = sum(1 for line in f if line.strip())
+        
+        if count == 0:
+            return 1
+        return max(1, int(parameters.threads / count))
+    except Exception:
+        return 1
+
+
 rule run_generic_nextclade:
     message:
         "Run generic nextclade for blast identified virus {wildcards.virus}"
@@ -325,7 +360,7 @@ rule run_generic_nextclade:
         nextclade_tsv = f"{parameters.output_dir}/nextclade_results/{{virus}}.generic.nextclade.tsv",
         nextclade_gff = f"{parameters.output_dir}/gff_files/{{virus}}.generic.nextclade.gff"
     threads:
-        parameters.threads
+        get_generic_nextclade_threads
     log:
         f"{parameters.output_dir}/logs/generic_nextclade.{{virus}}.log"
     shell:
