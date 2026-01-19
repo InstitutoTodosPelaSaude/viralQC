@@ -473,4 +473,8 @@ rule extract_target_regions:
         # Remove range values (:start-end) that seqtk subseq includes in the header.
         seqtk subseq {input.sequences} {output.target_regions_bed} | \
             sed -e 's/\:[0-9]*-[0-9]*$//g' > {output.target_regions_sequences} 2>>{log}
+        
+        # Clean up intermediate files
+        rm -rf {parameters.output_dir}/sequences_sanitized.fasta
+        find {parameters.output_dir}/identified_datasets/ -mindepth 1 -type d -exec rm -rf {{}} +
         """
