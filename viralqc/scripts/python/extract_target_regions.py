@@ -222,7 +222,10 @@ def process_and_write_bed(
                     get_sanitized_id(seq_name, id_map) if id_map else seq_name
                 )
 
-                genome_quality = row.get("genomeQuality", "")
+                genome_quality = row.get("genomeQuality")
+                if not isinstance(genome_quality, str) or not genome_quality:
+                    continue
+
                 target_regions_quality = row.get("targetRegionsQuality", "")
                 target_gene_quality = row.get("targetGeneQuality", "")
 
