@@ -1,7 +1,7 @@
-import argparse, json, gc
+import argparse, json, gc, re
 from pathlib import Path
 from typing import Generator, Iterator
-from pandas import read_csv, concat, DataFrame
+from pandas import read_csv, concat, DataFrame, Series
 from glob import glob
 from enum import Enum
 
@@ -16,7 +16,6 @@ def load_id_mapping(mapping_path: Path) -> dict:
     """
     Load the ID mapping TSV file. Returns a dict mapping Original Header -> Sanitized ID.
     """
-    mapping = {}
     try:
         with open(mapping_path, "r") as f:
             reader = read_csv(f, sep="\t", dtype=str)
@@ -35,7 +34,7 @@ REQUIRED_COLUMNS = {
     "targetGene": str,
 }
 
-DEFAULT_CHUNK_SIZE = 10000
+DEFAULT_CHUNK_SIZE = 50000  # Increased for better throughput
 
 
 def read_gffs(files: list[str]) -> DataFrame:
@@ -80,6 +79,49 @@ def read_gffs(files: list[str]) -> DataFrame:
     return df
 
 
+def build_gff_index(gff_info: DataFrame) -> dict:
+    """
+    Build an optimized index from GFF data for fast lookups.
+    
+    Returns a dict: {seqname: {"genome": (start, end), "genes": {gene_name: (start, end)}}}
+    """
+    index = {}
+    gene_pattern = re.compile(r"gene_name=([^;]+)")
+    
+    for seqname, df_seq in gff_info.groupby("seqname"):
+        index[seqname] = {"genome": None, "genes": {}}
+        
+        # Get genome region
+        region_rows = df_seq[df_seq["feature"] == "region"]
+        if not region_rows.empty:
+            index[seqname]["genome"] = (
+                int(region_rows["start"].iloc[0]) - 1,
+                int(region_rows["end"].iloc[0]),
+            )
+        
+        # Get gene regions - extract gene names once
+        gene_rows = df_seq[df_seq["feature"] == "gene"]
+        for row in gene_rows.itertuples():
+            attr = row.attribute
+            match = gene_pattern.search(str(attr))
+            if match:
+                gene_name = match.group(1)
+                start = int(row.start)
+                end = int(row.end)
+                
+                if gene_name in index[seqname]["genes"]:
+                    # Extend existing gene range
+                    old_start, old_end = index[seqname]["genes"][gene_name]
+                    index[seqname]["genes"][gene_name] = (
+                        min(old_start, start - 1),
+                        max(old_end, end),
+                    )
+                else:
+                    index[seqname]["genes"][gene_name] = (start - 1, end)
+    
+    return index
+
+
 def read_pp_nextclade_chunks(
     pp_results: Path, output_format: str, chunk_size: int = DEFAULT_CHUNK_SIZE
 ) -> Generator[DataFrame, None, None]:
@@ -102,19 +144,14 @@ def read_pp_nextclade_chunks(
 
         df = DataFrame(js["data"])
         del js
-        gc.collect()
 
         available_cols = [col for col in REQUIRED_COLUMNS.keys() if col in df.columns]
         df = df[available_cols]
 
         for start in range(0, len(df), chunk_size):
-            chunk = df.iloc[start : start + chunk_size].copy()
-            yield chunk
-            del chunk
-            gc.collect()
+            yield df.iloc[start : start + chunk_size].copy()
 
         del df
-        gc.collect()
     else:
         chunks = read_csv(
             pp_results,
@@ -127,8 +164,169 @@ def read_pp_nextclade_chunks(
 
         for chunk in chunks:
             yield chunk
-            del chunk
-            gc.collect()
+
+
+def get_region_interval_fast(
+    seq: str, region: str, gff_index: dict
+) -> tuple | None:
+    """
+    Get the genomic interval for a single sequence and region using pre-built index.
+    """
+    if " " in seq:
+        seq_norm = seq.split()[0]
+    else:
+        seq_norm = seq
+
+    seq_data = gff_index.get(seq_norm)
+    if seq_data is None:
+        return None
+
+    if isinstance(region, float) or not region:
+        return None
+
+    if region == "genome":
+        if seq_data["genome"] is not None:
+            return (seq_data["genome"][0], seq_data["genome"][1], "genome")
+        return None
+    
+    # Handle multiple genes separated by |
+    genes = region.split("|")
+    found_genes = []
+    min_start = float('inf')
+    max_end = 0
+    
+    for gene in genes:
+        if gene in seq_data["genes"]:
+            start, end = seq_data["genes"][gene]
+            min_start = min(min_start, start)
+            max_end = max(max_end, end)
+            found_genes.append(gene)
+    
+    if found_genes:
+        return (min_start, max_end, ",".join(found_genes))
+    
+    return None
+
+
+def process_chunk_vectorized(
+    chunk: DataFrame,
+    gff_index: dict,
+    id_map: dict,
+    written_sequences: set,
+) -> list:
+    """
+    Process a chunk using vectorized operations where possible.
+    Returns list of BED lines to write.
+    """
+    results = []
+    
+    # Filter out already written sequences first
+    if written_sequences:
+        mask = ~chunk["seqName"].isin(written_sequences)
+        chunk = chunk[mask]
+    
+    if chunk.empty:
+        return results
+    
+    # Determine region for each row using vectorized conditions
+    conditions = [
+        chunk["genomeQuality"].isin(["A", "B"]),
+        chunk["targetRegionsQuality"].isin(["A", "B"]),
+        chunk["targetGeneQuality"].isin(["A", "B"]),
+    ]
+    
+    # Process rows that have valid quality - use itertuples for speed
+    for row in chunk.itertuples(index=False):
+        seq_name = row.seqName
+        
+        if seq_name in written_sequences:
+            continue
+        
+        genome_quality = getattr(row, "genomeQuality", None)
+        target_regions_quality = getattr(row, "targetRegionsQuality", "")
+        target_gene_quality = getattr(row, "targetGeneQuality", "")
+        
+        region = None
+        if genome_quality in ["A", "B"]:
+            region = "genome"
+        elif target_regions_quality in ["A", "B"]:
+            region = getattr(row, "targetRegions", "")
+        elif target_gene_quality in ["A", "B"]:
+            region = getattr(row, "targetGene", "")
+        
+        if region is None:
+            continue
+        
+        sanitized_id = id_map.get(seq_name, seq_name) if id_map else seq_name
+        interval = get_region_interval_fast(sanitized_id, region, gff_index)
+        
+        if interval is not None:
+            start, end, region_name = interval
+            results.append(f"{seq_name}\t{int(start)}\t{int(end)}\t{region_name}\n")
+            written_sequences.add(seq_name)
+    
+    return results
+
+
+def process_and_write_bed(
+    chunks_iter: Iterator[DataFrame],
+    gff_info: DataFrame,
+    output_file: Path,
+    id_map: dict,
+) -> None:
+    """
+    Process chunks and write BED file incrementally without accumulating data in memory.
+    Optimized version with pre-built GFF index and vectorized operations.
+    """
+    # Build optimized index once
+    gff_index = build_gff_index(gff_info)
+    written_sequences = set()
+    
+    with output_file.open("w") as f:
+        for chunk in chunks_iter:
+            lines = process_chunk_vectorized(chunk, gff_index, id_map, written_sequences)
+            if lines:
+                f.writelines(lines)
+    
+    # Only cleanup at the end
+    del gff_index, written_sequences
+    gc.collect()
+
+
+# Keep original functions for backwards compatibility
+def read_pp_nextclade(pp_results: Path, output_format: str) -> DataFrame:
+    """
+    Read results from post process nextclade independent of file format.
+
+    Args:
+        pp_results: Path to post process nextclade output file
+        output_format: Format of the input file
+
+    Returns:
+        A dataframe that represents the post process nextclade output
+    """
+    sep = Separator[output_format].value
+    if not sep:
+        with open(pp_results) as f:
+            js = json.load(f)
+        df = DataFrame(js["data"]).set_index("index")
+        available_cols = [col for col in REQUIRED_COLUMNS.keys() if col in df.columns]
+        df = df[available_cols]
+    else:
+        df = read_csv(
+            pp_results,
+            sep=sep,
+            header=0,
+            usecols=lambda col: col in REQUIRED_COLUMNS,
+            dtype=REQUIRED_COLUMNS,
+        )
+
+    df = df[
+        df["genomeQuality"].notna()
+        & (df["genomeQuality"] != "")
+        & (df["genomeQuality"].astype(str).str.lower() != "none")
+    ]
+    return df
 
 
 def get_region_interval(
@@ -136,14 +334,7 @@ def get_region_interval(
 ) -> tuple | None:
     """
     Get the genomic interval for a single sequence and region.
-
-    Args:
-        seq: Sequence name
-        region: Target region string
-        seq_to_gff: Dictionary mapping sequence names to GFF dataframes
-
-    Returns:
-        Tuple of (start, end, region_name) or None if not found
+    Legacy function for backwards compatibility.
     """
     if " " in seq:
         seq_norm = seq.split()[0]
@@ -184,118 +375,18 @@ def get_region_interval(
     return None
 
 
-def get_sanitized_id(seq_name: str, id_map: dict) -> str:
-    """
-    Get the sanitized ID for a sequence name.
-    If not in map, return original (fallback).
-    """
-    return id_map.get(seq_name, seq_name)
-
-
-def process_and_write_bed(
-    chunks_iter: Iterator[DataFrame],
-    gff_info: DataFrame,
-    output_file: Path,
-    id_map: dict,
-) -> None:
-    """
-    Process chunks and write BED file incrementally without accumulating data in memory.
-
-    Args:
-        chunks_iter: Iterator yielding DataFrame chunks
-        gff_info: A dataframe that represents the GFF file
-        output_file: Output file path
-        id_map: Dictionary mapping Original Header -> Sanitized ID
-    """
-    seq_to_gff = {seq: df for seq, df in gff_info.groupby("seqname")}
-    written_sequences = set()
-
-    with output_file.open("w") as f:
-        for chunk in chunks_iter:
-            for _, row in chunk.iterrows():
-                seq_name = row["seqName"]
-
-                if seq_name in written_sequences:
-                    continue
-
-                sanitized_id = (
-                    get_sanitized_id(seq_name, id_map) if id_map else seq_name
-                )
-
-                genome_quality = row.get("genomeQuality")
-                if not isinstance(genome_quality, str) or not genome_quality:
-                    continue
-
-                target_regions_quality = row.get("targetRegionsQuality", "")
-                target_gene_quality = row.get("targetGeneQuality", "")
-
-                region = None
-                if genome_quality in ["A", "B"]:
-                    region = "genome"
-                elif target_regions_quality in ["A", "B"]:
-                    region = row.get("targetRegions", "")
-                elif target_gene_quality in ["A", "B"]:
-                    region = row.get("targetGene", "")
-
-                if region is None:
-                    continue
-
-                interval = get_region_interval(sanitized_id, region, seq_to_gff)
-
-                if interval is not None:
-                    start, end, region_name = interval
-                    f.write(f"{seq_name}\t{int(start)}\t{int(end)}\t{region_name}\n")
-                    written_sequences.add(seq_name)
-
-            del chunk
-            gc.collect()
-
-    del seq_to_gff, written_sequences
-    gc.collect()
-
-
-# Keep original functions for backwards compatibility
-def read_pp_nextclade(pp_results: Path, output_format: str) -> DataFrame:
-    """
-    Read results from post process nextclade independent of file format.
-
-    Args:
-        pp_results: Path to post process nextclade output file
-        output_format: Format of the input file
-
-    Returns:
-        A dataframe that represents the post process nextclade output
-    """
-    sep = Separator[output_format].value
-    if not sep:
-        with open(pp_results) as f:
-            js = json.load(f)
-        df = DataFrame(js["data"]).set_index("index")
-        available_cols = [col for col in REQUIRED_COLUMNS.keys() if col in df.columns]
-        df = df[available_cols]
-    else:
-        df = read_csv(
-            pp_results,
-            sep=sep,
-            header=0,
-            usecols=lambda col: col in REQUIRED_COLUMNS,
-            dtype=REQUIRED_COLUMNS,
-        )
-    return df
-
-
 def check_target_regions(pp_results: DataFrame) -> dict:
     """
     Creates a dictionary mapping sequence names to target region names based on quality criteria.
     """
     sequence_and_region = {}
-    for _, row in pp_results.iterrows():
-        if row["genomeQuality"] in ["A", "B"]:
-            sequence_and_region[row["seqName"]] = "genome"
-        elif row["targetRegionsQuality"] in ["A", "B"]:
-            sequence_and_region[row["seqName"]] = row["targetRegions"]
-        elif row["targetGeneQuality"] in ["A", "B"]:
-            sequence_and_region[row["seqName"]] = row["targetGene"]
+    for row in pp_results.itertuples(index=False):
+        if row.genomeQuality in ["A", "B"]:
+            sequence_and_region[row.seqName] = "genome"
+        elif row.targetRegionsQuality in ["A", "B"]:
+            sequence_and_region[row.seqName] = row.targetRegions
+        elif row.targetGeneQuality in ["A", "B"]:
+            sequence_and_region[row.seqName] = row.targetGene
     return sequence_and_region
 
 
@@ -348,7 +439,7 @@ if __name__ == "__main__":
         "--chunk-size",
         type=int,
         default=DEFAULT_CHUNK_SIZE,
-        help="Number of rows to process at a time (default: 10000).",
+        help="Number of rows to process at a time (default: 50000).",
     )
     parser.add_argument(
         "--id-mapping",
