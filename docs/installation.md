@@ -76,3 +76,40 @@ pip install -e .
 ```bash
 vqc --help
 ```
+
+## Docker
+
+We provide a Dockerfile to build a container with all the dependencies installed as well as with the viralQC datasets.
+
+### Step 1: Clone the Repository
+
+```bash
+git clone https://github.com/InstitutoTodosPelaSaude/viralQC.git
+cd viralQC
+```
+
+### Step 2: Build the Docker Image
+
+```bash
+docker build -t vqc .
+```
+
+### Step 3: Verify Installation
+
+```bash
+docker run vqc --help
+```
+
+### Step 4: Run viralQC
+
+You can run viralQC using the following command:
+
+```bash
+ docker run \
+  -v $(pwd)/test_data:/app/test_data \
+  -v $(pwd)/test_outputs:/app/outputs \
+  vqc run \
+  --input /app/test_data/sequences.fasta -v
+```
+
+Where the volumes of input and output directories are mounted to the container.
