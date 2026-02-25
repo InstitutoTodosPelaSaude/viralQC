@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import argparse
 import sys
 from Bio import SeqIO
@@ -23,8 +22,9 @@ def main():
     args = parse_args()
 
     try:
-        with open(args.output_fasta, "w") as output_handle, \
-             open(args.output_mapping, "w", newline="") as map_handle:
+        with open(args.output_fasta, "w") as output_handle, open(
+            args.output_mapping, "w", newline=""
+        ) as map_handle:
 
             writer = csv.DictWriter(
                 map_handle, fieldnames=["id", "original_header"], delimiter="\t"

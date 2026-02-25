@@ -20,7 +20,14 @@ output/             # Diretório de saída especificado pelo usuário (ex: --out
     │   └── <accession>.generic.nextclade.tsv
     ├── gff_files/
     │   ├── <virus>.nextclade.gff
-    │   └── <accession>.generic.nextclade.gff
+    │   ├── <accession>.generic.nextclade.gff
+    │   └── per_sample/
+    │       └── <id>_<nome_amostra>.gff
+    ├── tbl_files/
+    │   ├── <virus>.nextclade.tbl
+    │   ├── <accession>.generic.nextclade.tbl
+    │   └── per_sample/
+    │       └── <id>_<nome_amostra>.tbl
     ├── logs/
     │   ├── nextclade_sort.log
     │   ├── blast.log
@@ -154,3 +161,44 @@ seq2    0       10735   genome
 ### sequences_target_regions.fasta
 
 Sequências extraídas das regiões que atendem aos critérios de qualidade.
+
+## Arquivos de Anotação
+
+### gff_files/
+
+Contém arquivos de anotação GFF3 produzidos pelo Nextclade para cada dataset de vírus.
+Cada arquivo abrange todas as amostras analisadas para aquele vírus (identificadas por IDs numéricos).
+
+| Arquivo | Descrição |
+|---------|-----------|
+| `<virus>.nextclade.gff` | GFF multi-amostra da execução padrão do Nextclade |
+| `<accession>.generic.nextclade.gff` | GFF multi-amostra da execução genérica do Nextclade via BLAST |
+
+#### gff_files/per_sample/
+
+Um arquivo GFF por amostra, gerado automaticamente a partir da saída combinada acima.
+O ID numérico utilizado internamente pelo viralQC é substituído pelo cabeçalho
+original da amostra em todo o arquivo (diretiva de região, coluna 1 e atributos).
+
+- **Formato do nome:** `{id}_{nome_amostra}.gff`
+
+### tbl_files/
+
+Contém arquivos de tabela de features (TBL) de 5 colunas produzidos pelo Nextclade
+para cada dataset de vírus. O formato TBL é compatível com as ferramentas de
+submissão do NCBI.
+
+| Arquivo | Descrição |
+|---------|-----------|
+| `<virus>.nextclade.tbl` | TBL multi-amostra da execução padrão do Nextclade |
+| `<accession>.generic.nextclade.tbl` | TBL multi-amostra da execução genérica do Nextclade via BLAST |
+
+#### tbl_files/per_sample/
+
+Um arquivo TBL por amostra, gerado automaticamente a partir da saída combinada acima.
+O cabeçalho `>Feature <id>` de cada bloco é substituído pelo nome original da amostra.
+
+- **Formato do nome:** `{id}_{nome_amostra}.tbl`
+
+> **Nota:** Arquivos em `per_sample/` podem estar vazios (zero bytes) para amostras
+> nas quais o Nextclade foi executado sem arquivo GFF de referência.

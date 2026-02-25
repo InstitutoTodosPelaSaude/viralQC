@@ -283,10 +283,12 @@ rule nextclade:
         "Run nextclade for virus {wildcards.virus}"
     input:
         fasta = get_fasta_for_virus,
-        dataset = get_dataset_for_virus
+        dataset = get_dataset_for_virus,
+        id_mapping = rules.itemize_sequences.output.mapping
     output:
         nextclade_tsv = f"{parameters.output_dir}/nextclade_results/{{virus}}.nextclade.tsv",
-        nextclade_gff = f"{parameters.output_dir}/gff_files/{{virus}}.nextclade.gff"
+        nextclade_gff = f"{parameters.output_dir}/gff_files/{{virus}}.nextclade.gff",
+        nextclade_tbl = f"{parameters.output_dir}/tbl_files/{{virus}}.nextclade.tbl"
     threads:
         get_nextclade_threads
     log:
@@ -299,6 +301,7 @@ rule nextclade:
             --input-dataset {input.dataset} \
             --output-tsv {output.nextclade_tsv}.tmp \
             --output-annotation-gff {output.nextclade_gff} \
+            --output-annotation-tbl {output.nextclade_tbl} \
             --min-seed-cover 0.05 \
             --jobs {threads} \
             {input.fasta} 2>{log}
@@ -310,6 +313,16 @@ rule nextclade:
             --output {output.nextclade_tsv} 2>>{log}
 
         rm {output.nextclade_tsv}.tmp
+
+        # Split the multi-sample GFF into one file per sample
+        python {PKG_PATH}/scripts/python/split_gff_by_sample.py \
+            --gff {output.nextclade_gff} \
+            --id-mapping {input.id_mapping} 2>>{log}
+
+        # Split the multi-sample TBL into one file per sample
+        python {PKG_PATH}/scripts/python/split_tbl_by_sample.py \
+            --tbl {output.nextclade_tbl} \
+            --id-mapping {input.id_mapping} 2>>{log}
         """
 
 checkpoint process_blast_results:
@@ -352,13 +365,15 @@ rule run_generic_nextclade:
     input:
         sequences = rules.itemize_sequences.output.fasta,
         blast_results = rules.blast.output.viruses_identified,
-        blast_database = parameters.blast_database
+        blast_database = parameters.blast_database,
+        id_mapping = rules.itemize_sequences.output.mapping
     params:
         output_dir = parameters.output_dir,
         datasets_dir = parameters.datasets_local_path
     output:
         nextclade_tsv = f"{parameters.output_dir}/nextclade_results/{{virus}}.generic.nextclade.tsv",
-        nextclade_gff = f"{parameters.output_dir}/gff_files/{{virus}}.generic.nextclade.gff"
+        nextclade_gff = f"{parameters.output_dir}/gff_files/{{virus}}.generic.nextclade.gff",
+        nextclade_tbl = f"{parameters.output_dir}/tbl_files/{{virus}}.generic.nextclade.tbl"
     threads:
         get_generic_nextclade_threads
     log:
@@ -385,6 +400,7 @@ rule run_generic_nextclade:
                 --input-annotation "$GFF_FILE" \
                 --output-tsv {output.nextclade_tsv}.tmp \
                 --output-annotation-gff {output.nextclade_gff} \
+                --output-annotation-tbl {output.nextclade_tbl} \
                 --min-seed-cover 0.05 \
                 --jobs {threads} \
                 {params.output_dir}/blast_results/{wildcards.virus}.fasta 2>>{log}
@@ -405,6 +421,21 @@ rule run_generic_nextclade:
                 --jobs {threads} \
                 {params.output_dir}/blast_results/{wildcards.virus}.fasta 2>>{log}
             touch {output.nextclade_gff}
+            touch {output.nextclade_tbl}
+        fi
+
+        # Split the multi-sample GFF into one file per sample (skip if GFF is empty)
+        if [ -s {output.nextclade_gff} ]; then
+            python {PKG_PATH}/scripts/python/split_gff_by_sample.py \
+                --gff {output.nextclade_gff} \
+                --id-mapping {input.id_mapping} 2>>{log}
+        fi
+
+        # Split the multi-sample TBL into one file per sample (skip if TBL is empty)
+        if [ -s {output.nextclade_tbl} ]; then
+            python {PKG_PATH}/scripts/python/split_tbl_by_sample.py \
+                --tbl {output.nextclade_tbl} \
+                --id-mapping {input.id_mapping} 2>>{log}
         fi
 
         rm {params.output_dir}/blast_results/{wildcards.virus}.ids {params.output_dir}/blast_results/{wildcards.virus}.ref.id {params.output_dir}/blast_results/{wildcards.virus}.fasta {params.output_dir}/blast_results/{wildcards.virus}.ref.fasta
@@ -423,7 +454,8 @@ rule post_process_nextclade:
         blast_database_metadata = {parameters.blast_database_metadata},
         id_mapping = rules.itemize_sequences.output.mapping
     params:
-        output_format = parameters.output_format
+        output_format = parameters.output_format,
+        output_dir = parameters.output_dir
     output:
         output_file = f"{parameters.output_dir}/{parameters.output_file}"
     log:
@@ -441,7 +473,8 @@ rule post_process_nextclade:
             --id-mapping {input.id_mapping} \
             --config-file {input.config_file} \
             --output {output.output_file} \
-            --output-format {params.output_format} 2>{log}
+            --output-format {params.output_format} \
+            --output-dir {params.output_dir} 2>{log}
         """
 
 rule extract_target_regions:

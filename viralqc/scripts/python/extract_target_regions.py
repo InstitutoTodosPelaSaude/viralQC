@@ -82,15 +82,15 @@ def read_gffs(files: list[str]) -> DataFrame:
 def build_gff_index(gff_info: DataFrame) -> dict:
     """
     Build an optimized index from GFF data for fast lookups.
-    
+
     Returns a dict: {seqname: {"genome": (start, end), "genes": {gene_name: (start, end)}}}
     """
     index = {}
     gene_pattern = re.compile(r"gene_name=([^;]+)")
-    
+
     for seqname, df_seq in gff_info.groupby("seqname"):
         index[seqname] = {"genome": None, "genes": {}}
-        
+
         # Get genome region
         region_rows = df_seq[df_seq["feature"] == "region"]
         if not region_rows.empty:
@@ -98,7 +98,7 @@ def build_gff_index(gff_info: DataFrame) -> dict:
                 int(region_rows["start"].iloc[0]) - 1,
                 int(region_rows["end"].iloc[0]),
             )
-        
+
         # Get gene regions - extract gene names once
         gene_rows = df_seq[df_seq["feature"] == "gene"]
         for row in gene_rows.itertuples():
@@ -108,7 +108,7 @@ def build_gff_index(gff_info: DataFrame) -> dict:
                 gene_name = match.group(1)
                 start = int(row.start)
                 end = int(row.end)
-                
+
                 if gene_name in index[seqname]["genes"]:
                     # Extend existing gene range
                     old_start, old_end = index[seqname]["genes"][gene_name]
@@ -118,7 +118,7 @@ def build_gff_index(gff_info: DataFrame) -> dict:
                     )
                 else:
                     index[seqname]["genes"][gene_name] = (start - 1, end)
-    
+
     return index
 
 
@@ -166,9 +166,7 @@ def read_pp_nextclade_chunks(
             yield chunk
 
 
-def get_region_interval_fast(
-    seq: str, region: str, gff_index: dict
-) -> tuple | None:
+def get_region_interval_fast(seq: str, region: str, gff_index: dict) -> tuple | None:
     """
     Get the genomic interval for a single sequence and region using pre-built index.
     """
@@ -188,23 +186,23 @@ def get_region_interval_fast(
         if seq_data["genome"] is not None:
             return (seq_data["genome"][0], seq_data["genome"][1], "genome")
         return None
-    
+
     # Handle multiple genes separated by |
     genes = region.split("|")
     found_genes = []
-    min_start = float('inf')
+    min_start = float("inf")
     max_end = 0
-    
+
     for gene in genes:
         if gene in seq_data["genes"]:
             start, end = seq_data["genes"][gene]
             min_start = min(min_start, start)
             max_end = max(max_end, end)
             found_genes.append(gene)
-    
+
     if found_genes:
         return (min_start, max_end, ",".join(found_genes))
-    
+
     return None
 
 
@@ -219,33 +217,33 @@ def process_chunk_vectorized(
     Returns list of BED lines to write.
     """
     results = []
-    
+
     # Filter out already written sequences first
     if written_sequences:
         mask = ~chunk["seqName"].isin(written_sequences)
         chunk = chunk[mask]
-    
+
     if chunk.empty:
         return results
-    
+
     # Determine region for each row using vectorized conditions
     conditions = [
         chunk["genomeQuality"].isin(["A", "B"]),
         chunk["targetRegionsQuality"].isin(["A", "B"]),
         chunk["targetGeneQuality"].isin(["A", "B"]),
     ]
-    
+
     # Process rows that have valid quality - use itertuples for speed
     for row in chunk.itertuples(index=False):
         seq_name = row.seqName
-        
+
         if seq_name in written_sequences:
             continue
-        
+
         genome_quality = getattr(row, "genomeQuality", None)
         target_regions_quality = getattr(row, "targetRegionsQuality", "")
         target_gene_quality = getattr(row, "targetGeneQuality", "")
-        
+
         region = None
         if genome_quality in ["A", "B"]:
             region = "genome"
@@ -253,18 +251,18 @@ def process_chunk_vectorized(
             region = getattr(row, "targetRegions", "")
         elif target_gene_quality in ["A", "B"]:
             region = getattr(row, "targetGene", "")
-        
+
         if region is None:
             continue
-        
+
         sanitized_id = id_map.get(seq_name, seq_name) if id_map else seq_name
         interval = get_region_interval_fast(sanitized_id, region, gff_index)
-        
+
         if interval is not None:
             start, end, region_name = interval
             results.append(f"{seq_name}\t{int(start)}\t{int(end)}\t{region_name}\n")
             written_sequences.add(seq_name)
-    
+
     return results
 
 
@@ -281,13 +279,15 @@ def process_and_write_bed(
     # Build optimized index once
     gff_index = build_gff_index(gff_info)
     written_sequences = set()
-    
+
     with output_file.open("w") as f:
         for chunk in chunks_iter:
-            lines = process_chunk_vectorized(chunk, gff_index, id_map, written_sequences)
+            lines = process_chunk_vectorized(
+                chunk, gff_index, id_map, written_sequences
+            )
             if lines:
                 f.writelines(lines)
-    
+
     # Only cleanup at the end
     del gff_index, written_sequences
     gc.collect()

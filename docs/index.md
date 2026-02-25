@@ -29,6 +29,7 @@ installation
 configuration
 scoring
 commands
+prepare-ncbi-submission
 adding-datasets
 output
 examples
