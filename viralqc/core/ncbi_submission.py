@@ -10,6 +10,9 @@ from Bio.SeqRecord import SeqRecord
 
 logger = logging.getLogger(__name__)
 
+# NCBI limits submissions to 3 000 sequences per file.
+NCBI_BATCH_SIZE = 2999
+
 PLAIN_HEADER_VIRUSES = frozenset(
     {
         "SARS-CoV-2",
@@ -21,12 +24,21 @@ PLAIN_HEADER_VIRUSES = frozenset(
         "Influenza A H3N2",
         "Influenza B virus (B/Lee/1940)",
         "Influenza C virus (C/Ann Arbor/1/50)",
+        "Norovirus GI",
+        "Norovirus GII",
+        "Norovirus GIII",
+        "Norovirus GIV",
+        "Norovirus GV",
+        "Norovirus GVI",
     }
 )
 
 
 _INFLUENZA_RE = re.compile(r"^Influenza\s+(A|B|C)", re.IGNORECASE)
 _DENGUE_RE = re.compile(r"Dengue virus type\s+(\d)", re.IGNORECASE)
+_NOROVIRUS_RE = re.compile(
+    r"^Norovirus\b.*?(G(?:VI|V|IV|III|II|I))\b", re.IGNORECASE
+)
 # Characters forbidden in FASTA headers / filenames
 _UNSAFE_RE = re.compile(r"[^\x00-\x7F]|[|/\\\s]")
 
@@ -155,25 +167,27 @@ def filter_sequences(
     return kept, dropped
 
 
-def write_fasta(
+def _batch_path(base_path: Path, batch_index: int) -> Path:
+    """
+    Return a numbered batch path, e.g. ``sequences.fasta → sequences.1.fasta``.
+
+    Args:
+        base_path: The original output path (e.g. ``out_dir / "sequences.fasta"``).
+        batch_index: 1-based batch number.
+
+    Returns:
+        Path with the batch number inserted before the extension.
+    """
+    return base_path.with_suffix(f".{batch_index}{base_path.suffix}")
+
+
+def _write_fasta_single(
     records: list,
     out_path: Path,
     header_fn=None,
     rename_log: list | None = None,
 ) -> None:
-    """
-    Write SeqRecords to a FASTA file, optionally applying a custom header.
-
-    Non-ASCII / unsafe characters in the final header are sanitized and
-    logged to *rename_log* (a list of dicts) if provided.
-
-    Args:
-        records: List of SeqRecord objects.
-        out_path: Destination file path.
-        header_fn: Optional callable (record) → str to compute the header.
-            When None, the record.id is used.
-        rename_log: Optional list to append rename events to.
-    """
+    """Write a single batch of SeqRecords to a FASTA file."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="ascii", errors="replace") as fh:
         for rec in records:
@@ -187,6 +201,45 @@ def write_fasta(
                     }
                 )
             fh.write(f">{clean_header}\n{rec.seq}\n")
+
+
+def write_fasta(
+    records: list,
+    out_path: Path,
+    header_fn=None,
+    rename_log: list | None = None,
+) -> None:
+    """
+    Write SeqRecords to FASTA file(s), optionally applying a custom header.
+
+    When the number of records exceeds :data:`NCBI_BATCH_SIZE` (3 000),
+    the output is automatically split into numbered files
+    (e.g. ``sequences.1.fasta``, ``sequences.2.fasta``, …).
+
+    Non-ASCII / unsafe characters in the final header are sanitized and
+    logged to *rename_log* (a list of dicts) if provided.
+
+    Args:
+        records: List of SeqRecord objects.
+        out_path: Destination file path.
+        header_fn: Optional callable (record) → str to compute the header.
+            When None, the record.id is used.
+        rename_log: Optional list to append rename events to.
+    """
+    if len(records) <= NCBI_BATCH_SIZE:
+        _write_fasta_single(records, out_path, header_fn, rename_log)
+        return
+
+    for i in range(0, len(records), NCBI_BATCH_SIZE):
+        batch = records[i : i + NCBI_BATCH_SIZE]
+        batch_idx = i // NCBI_BATCH_SIZE + 1
+        _write_fasta_single(batch, _batch_path(out_path, batch_idx), header_fn, rename_log)
+        logger.info(
+            "Batch %d: %d sequences written to %s",
+            batch_idx,
+            len(batch),
+            _batch_path(out_path, batch_idx),
+        )
 
 
 def write_dropped_table(dropped: list, out_path: Path) -> None:
@@ -261,6 +314,8 @@ def is_plain_header_virus(virus_name: str) -> bool:
         return True
     if _INFLUENZA_RE.match(virus_name):
         return True
+    if _NOROVIRUS_RE.match(virus_name):
+        return True
     return False
 
 
@@ -290,14 +345,29 @@ _SC2_OUTPUT_COLS = [
     "isolate",
     "collection-date",
 ]
-_CUSTOM_OUTPUT_COLS = [
+_NOROVIRUS_OUTPUT_COLS = [
     "Sequence_ID",
-    "Organism",
+    "collection-date",
+    "genotype",
     "geo_loc_name",
     "host",
     "isolate",
-    "collection-date",
     "isolation-source",
+]
+_CUSTOM_RENAME_MAP = {
+    "geo_loc_name": "Country (geo_loc_name)",
+    "host": "Host",
+    "isolate": "Isolate",
+    "collection-date": "Collection_date",
+    "isolation-source": "Isolation_source",
+}
+_CUSTOM_OUTPUT_COLS = [
+    "Sequence_ID",
+    "Country (geo_loc_name)",
+    "Host",
+    "Isolate",
+    "Collection_date",
+    "Isolation_source",
 ]
 
 
@@ -360,6 +430,15 @@ def _serotype_fields(virus: str, clade: str) -> dict:
     m_dengue = _DENGUE_RE.search(virus)
     if m_dengue:
         return {"genotype": m_dengue.group(1), "serotype": clade_clean}
+    m_noro = _NOROVIRUS_RE.search(virus)
+    if m_noro:
+        # Extract the genotype (e.g. GII.17, GVI.1, GI) from the virus string
+        noro_after = re.sub(r"^Norovirus\s+", "", virus, flags=re.IGNORECASE)
+        geno_match = re.search(
+            r"(G(?:VI|V|IV|III|II|I)(?:\.\w+)?)", noro_after, re.IGNORECASE
+        )
+        noro_genotype = geno_match.group(1) if geno_match else m_noro.group(1)
+        return {"genotype": noro_genotype}
     m_flu = re.search(r"(H\d+N\d+)", virus)
     if m_flu:
         return {"serotype": m_flu.group(1)}
@@ -382,8 +461,8 @@ def write_submission_metadata(
     are: ``Sequence_ID, geo_loc_name, host, isolate, collection-date,
     isolation-source, serotype``.
 
-    For *custom* viruses the output columns are: ``Sequence_ID, Organism,
-    geo_loc_name, host, isolate, collection-date, isolation-source``.
+    For *custom* viruses the output columns are: ``Sequence_ID,
+    Country (geo_loc_name), Host, Isolate, Collection_date, Isolation_source``.
 
     Args:
         kept_records: SeqRecord list of sequences that passed filtering.
@@ -432,9 +511,9 @@ def write_submission_metadata(
         extra_virus_cols = [c for c in extra.columns if c not in standard_base]
         out_cols = standard_base + extra_virus_cols
     else:
-        meta["Organism"] = organism
+        meta.rename(columns=_CUSTOM_RENAME_MAP, inplace=True)
         if metadata_df is None:
-            out_cols = ["Sequence_ID", "Organism"]
+            out_cols = ["Sequence_ID"]
         else:
             out_cols = _CUSTOM_OUTPUT_COLS
 
@@ -442,6 +521,21 @@ def write_submission_metadata(
         if col not in meta.columns:
             meta[col] = ""
 
+    sep = "\t" if not is_standard else ","
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    meta[out_cols].to_csv(out_path, index=False)
-    logger.info("Metadata CSV written: %s", out_path)
+
+    if len(meta) <= NCBI_BATCH_SIZE:
+        meta[out_cols].to_csv(out_path, sep=sep, index=False)
+        logger.info("Metadata written: %s", out_path)
+    else:
+        for i in range(0, len(meta), NCBI_BATCH_SIZE):
+            batch = meta.iloc[i : i + NCBI_BATCH_SIZE]
+            batch_idx = i // NCBI_BATCH_SIZE + 1
+            batch_path = _batch_path(out_path, batch_idx)
+            batch[out_cols].to_csv(batch_path, sep=sep, index=False)
+            logger.info(
+                "Metadata batch %d written: %s (%d rows)",
+                batch_idx,
+                batch_path,
+                len(batch),
+            )

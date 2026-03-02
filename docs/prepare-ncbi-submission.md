@@ -23,7 +23,7 @@ vqc prepare-ncbi-submission virus [SUBCOMMAND] --results results.tsv --sequences
 
 ### Supported Viruses
 
-For Dengue, Influenza, and SARS-CoV-2, NCBI has specific submission requirements. Each requires specific columns in the `metadata.csv` file, and these subcommands format the metadata CSV accordingly.
+For Dengue, Influenza, Norovirus, and SARS-CoV-2, NCBI has specific submission requirements. Each requires specific columns in the `metadata.csv` file, and these subcommands format the metadata CSV accordingly.
 
 #### SARS-CoV-2
 ```bash
@@ -44,7 +44,14 @@ Organizes sequences by type, creating directories such as `ncbi_submission_Dengu
 vqc prepare-ncbi-submission virus influenza --results results.tsv --sequences-vqc sequences_target_regions.fasta --sequences-input original_sequences.fasta --metadata input_metadata.csv
 ```
 
-Organizes sequences by type with subdirectories for each segment, creating directories like `ncbi_submission_InfluenzaA/HA/`, `ncbi_submission_InfluenzaB_3/`, etc.
+Organizes sequences by type with subdirectories for each segment, creating directories like `ncbi_submission_InfluenzaA/HA/`, `ncbi_submission_InfluenzaA/NA/`, `ncbi_submission_InfluenzaB/HA/`, etc.
+
+#### Norovirus
+```bash
+vqc prepare-ncbi-submission virus norovirus --results results.tsv --sequences-vqc sequences_target_regions.fasta --sequences-input original_sequences.fasta --metadata input_metadata.csv
+```
+
+Organizes sequences by genogroup, creating subdirectories such as `ncbi_submission_Norovirus/GI/`, `ncbi_submission_Norovirus/GII/`, etc., depending on the genogroups identified in the ViralQC analysis. Supported genogroups are GI through GVI.
 
 #### Custom Viruses
 ```bash
@@ -58,7 +65,9 @@ vqc prepare-ncbi-submission virus custom \
 
 Organizes all sequences matching the given `--virus-name` into a single directory. Non-standard viruses automatically get the `[Organism=...]` qualifier added to their FASTA headers based on the `virus_species` identified. The name provided should be the same present into the `virus` field of the results file.
 
-Additionally, for custom viruses, you can pass `--tbl-dir` pointing to a folder to copy NCBI `.tbl` annotation files alongside the FASTA sequences. If you don't provide this option, the command will try to find the `.tbl` based on `tbl_path` field in the results file.
+If the virus has annotated segments (e.g., S, M, L), you can pass the `--split-by-segments` flag to organize sequences into per-segment subdirectories (e.g., `ncbi_submission_Oropouche_virus/S/`, `ncbi_submission_Oropouche_virus/M/`, `ncbi_submission_Oropouche_virus/L/`). Each subdirectory will contain its own `sequences.fasta`, `metadata.tsv`, `annotation.tbl`, and log files. Without this flag, all sequences are placed in a single flat directory.
+
+Additionally, for custom viruses, you can pass `--tbl-dir` pointing to a folder with per-sample `.tbl` annotation files. These will be concatenated into a single `annotation.tbl` file alongside the FASTA sequences. If you don't provide this option, the command will try to find the `.tbl` based on `tbl_path` field in the results file.
 
 ## Grouping by Sample (`sample`)
 
@@ -95,8 +104,8 @@ For all submission commands, you can (or must, for predefined viruses) provide a
 
 The input CSV can contain the following columns. Their necessity depends on the virus type being processed:
 
-| Column | Description | Dengue & Influenza | SARS-CoV-2 | Custom Viruses |
-|--------|-------------|--------------------|------------|----------------|
+| Column | Description | Dengue, Influenza & Norovirus | SARS-CoV-2 | Custom Viruses |
+|--------|-------------|-------------------------------|------------|----------------|
 | `Sequence_ID` | Must match the `seqName` exactly as it appears in the results file and FASTA headers. **Must be less than 25 characters long.** | **Required** | **Required** | **Required** |
 | `geo_loc_name` | The geographical location of the sample (e.g., Country). | **Required** | **Required** | Optional |
 | `host` | The natural host of the virus (e.g., `Homo sapiens`). Do not use special characters. | **Required** | **Required** | Optional |
@@ -108,12 +117,13 @@ The input CSV can contain the following columns. Their necessity depends on the 
 
 ### Output Format
 
-The `prepare-ncbi-submission` command will take your input CSV and generate a final `metadata.csv` inside each submission directory. The tool automatically enriches this file with taxonomic and typing data derived from the `viralQC` results:
+The `prepare-ncbi-submission` command will take your input CSV and generate a final metadata file inside each submission directory. For predefined viruses (SARS-CoV-2, Dengue, Influenza, Norovirus), a comma-delimited `metadata.csv` is generated. For custom viruses, a tab-delimited `metadata.tsv` is generated instead. The tool automatically enriches this file with taxonomic and typing data derived from the `viralQC` results:
 
 * **Influenza**: Adds `serotype` (e.g., `H1N1` or `H3N2`) extracted directly from the classification.
 * **Dengue**: Adds `genotype` (e.g., `1`, `2`, `3`, or `4`) and `serotype` (the detailed clade assignment).
+* **Norovirus**: Adds `genotype` (e.g., `GII`, `GII.17`) extracted from the virus classification. No `serotype` column is included.
 * **SARS-CoV-2**: Removes `isolation-source` and `serotype` as they are not typically included in SC2 NCBI submissions.
-* **Custom Viruses**: Adds an `Organism` column automatically populated with the scientific name from `virus_species` (e.g., `Orthopneumovirus hominis`).
+* **Custom Viruses**: Renames columns to NCBI-compatible names: `geo_loc_name` → `Country (geo_loc_name)`, `host` → `Host`, `isolate` → `Isolate`, `collection-date` → `Collection_date`, `isolation-source` → `Isolation_source`. No `Organism` column is added (the organism information is included in the FASTA headers as `[Organism=...]`).
 
 ## FASTA Headers and Annotations
 
@@ -122,3 +132,12 @@ FASTA headers are carefully managed during organization:
 * Unsafe characters in sequence names (non-ASCII or pipes) are sanitized to underscores for NCBI compatibility, with translations logged in `renamed_headers.tsv`.
 * Spaces and brackets are preserved correctly, allowing standard NCBI feature qualifiers like `[Organism=...]` to work as intended for non-standard viruses.
 
+## Batch Splitting
+
+NCBI limits submissions to 3,000 sequences per file. When a virus group exceeds this limit, the `sequences.fasta` and metadata files are automatically split into numbered batches:
+
+* `sequences.1.fasta`, `metadata.1.csv` (or `metadata.1.tsv` for custom viruses) — first 2,999 sequences
+* `sequences.2.fasta`, `metadata.2.csv` (or `metadata.2.tsv`) — next 2,999 sequences
+* …and so on.
+
+If a group has 2,999 or fewer sequences, the files are written normally without any suffix.

@@ -148,6 +148,8 @@ if __name__ == "__main__":
                 if line.startswith(">Feature "):
                     out_fh.write(f">Feature {original_header}\n")
                 else:
+                    # Nextclade uses "gene_name" but NCBI expects "gene"
+                    line = re.sub(r"(\t)gene_name(\t)", r"\1gene\2", line)
                     out_fh.write(line + "\n")
 
         n_written += 1

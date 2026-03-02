@@ -1,10 +1,10 @@
 import logging
+import pandas as pd
 import re
 import typer
 from pathlib import Path
 from typing import List, Optional
 from viralqc.core.ncbi_submission import (
-    copy_tbl,
     filter_sequences,
     is_plain_header_virus,
     load_fasta,
@@ -14,6 +14,8 @@ from viralqc.core.ncbi_submission import (
     write_fasta,
     write_rename_log,
     write_submission_metadata,
+    _NOROVIRUS_OUTPUT_COLS,
+    _NOROVIRUS_RE,
 )
 
 logger = logging.getLogger(__name__)
@@ -75,6 +77,7 @@ def _process_virus_group(
     skipped: list,
     summary_log: list,
     meta_df=None,
+    split_by_segments: bool = False,
 ) -> None:
     """Build the submission package for a grouped virus slice."""
     from viralqc.commands.prepare_ncbi_submission.virus import _safe_dir_name
@@ -173,6 +176,7 @@ def _process_virus_group(
 
     dir_virus_name = virus
     is_influenza = False
+    is_norovirus = False
     if "SARS-CoV-2" in virus:
         dir_virus_name = "SARS-CoV-2"
     elif m := re.search(r"Dengue virus type\s+(\d)", virus, re.IGNORECASE):
@@ -181,6 +185,11 @@ def _process_virus_group(
         flu_type = m.group(1).upper()
         dir_virus_name = f"Influenza{flu_type}"
         is_influenza = True
+    elif m := _NOROVIRUS_RE.search(virus):
+        genogroup = m.group(1).upper()
+        dir_virus_name = "Norovirus"
+        is_norovirus = True
+        noro_genogroup = genogroup
 
     base_out_dir = Path(f"{output_prefix}_{_safe_dir_name(dir_virus_name)}")
     base_out_dir.mkdir(parents=True, exist_ok=True)
@@ -193,8 +202,26 @@ def _process_virus_group(
                 _safe_dir_name(seg_str) if seg_str and seg_str != "nan" else "unknown"
             )
             segment_groups.append((base_out_dir / seg_safe, seg_df))
+    elif is_norovirus:
+        segment_groups.append((base_out_dir / noro_genogroup, group_df))
     else:
-        segment_groups.append((base_out_dir, group_df))
+        # Custom viruses: group by segment only when --split-by-segments is set
+        has_segments = (
+            split_by_segments
+            and "segment" in group_df.columns
+            and group_df["segment"].dropna().str.strip().replace("", pd.NA).dropna().any()
+        )
+        if has_segments:
+            for seg_val, seg_df in group_df.groupby("segment", dropna=False):
+                seg_str = str(seg_val).strip()
+                seg_safe = (
+                    _safe_dir_name(seg_str)
+                    if seg_str and seg_str != "nan"
+                    else "unknown"
+                )
+                segment_groups.append((base_out_dir / seg_safe, seg_df))
+        else:
+            segment_groups.append((base_out_dir, group_df))
 
     total_kept = 0
     for out_dir, seg_df in segment_groups:
@@ -229,13 +256,16 @@ def _process_virus_group(
             organism_label = (
                 virus_species if virus_species not in ("nan", "") else virus
             )
+            meta_ext = "csv" if use_plain_header else "tsv"
+            noro_base = _NOROVIRUS_OUTPUT_COLS if is_norovirus else None
             write_submission_metadata(
                 seg_kept,
                 seg_df,
                 meta_df,
-                out_dir / "metadata.csv",
+                out_dir / f"metadata.{meta_ext}",
                 is_standard=use_plain_header,
                 organism=organism_label,
+                base_cols=noro_base,
             )
 
         if seg_dropped:
@@ -249,27 +279,41 @@ def _process_virus_group(
 
         tbl_info = ""
         if not use_plain_header:
-            tbl_out_dir = out_dir / "tbl_files"
+            tbl_parts: list[str] = []
             n_tbl = 0
             for record in seg_kept:
                 sid = record.id
                 row = seg_df[seg_df["seqName"].str.strip() == sid].iloc[0]
-                tbl_path_str = str(row.get("tbl_path", "") or "").strip()
+                tbl_content = None
 
-                copied = False
                 if tbl_dir:
                     candidates = list(tbl_dir.glob(f"*_{sid}.tbl")) or list(
                         tbl_dir.glob(f"*{re.escape(sid)}*.tbl")
                     )
-                    if candidates:
-                        copied = copy_tbl(
-                            str(candidates[0]), tbl_out_dir, dest_name=f"{sid}.tbl"
+                    if candidates and candidates[0].exists():
+                        tbl_content = candidates[0].read_text(
+                            encoding="utf-8", errors="replace"
                         )
                 else:
-                    copied = copy_tbl(tbl_path_str, tbl_out_dir, dest_name=f"{sid}.tbl")
+                    tbl_path_str = str(row.get("tbl_path", "") or "").strip()
+                    if (
+                        tbl_path_str
+                        and tbl_path_str != "nan"
+                        and Path(tbl_path_str).exists()
+                    ):
+                        tbl_content = Path(tbl_path_str).read_text(
+                            encoding="utf-8", errors="replace"
+                        )
 
-                if copied:
+                if tbl_content:
+                    tbl_parts.append(tbl_content.rstrip("\n"))
                     n_tbl += 1
+
+            if tbl_parts:
+                combined_tbl = out_dir / "annotation.tbl"
+                combined_tbl.write_text(
+                    "\n".join(tbl_parts) + "\n", encoding="utf-8"
+                )
             if n_tbl > 0:
                 tbl_info = f" + {n_tbl} TBL"
 
@@ -317,13 +361,19 @@ def sample_cmd(
         ...,
         "--metadata",
         help="CSV with sample metadata (Sequence_ID, geo_loc_name, host, isolate, "
-        "collection-date, isolation-source). When provided, a metadata.csv is "
+        "collection-date, isolation-source). When provided, a metadata file is "
         "written into each sample output directory.",
     ),
     output_prefix: str = typer.Option(
         "ncbi_submission",
         "--output-prefix",
         help="Prefix for the per-sample output directories.",
+    ),
+    split_by_segments: bool = typer.Option(
+        False,
+        "--split-by-segments",
+        help="Organize custom virus output into per-segment subdirectories "
+        "when the virus has annotated segments (e.g. S, M, L).",
     ),
 ):
     """Prepare NCBI submission packages for specific samples (or all samples)."""
@@ -356,6 +406,7 @@ def sample_cmd(
             skipped,
             summary_log,
             meta_df,
+            split_by_segments,
         )
         total_kept += n_kept or 0
 

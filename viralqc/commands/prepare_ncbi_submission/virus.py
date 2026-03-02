@@ -1,10 +1,10 @@
 import logging
+import pandas as pd
 import re
 import typer
 from pathlib import Path
 from typing import Optional
 from viralqc.core.ncbi_submission import (
-    copy_tbl,
     filter_sequences,
     is_plain_header_virus,
     load_fasta,
@@ -14,6 +14,8 @@ from viralqc.core.ncbi_submission import (
     write_fasta,
     write_rename_log,
     write_submission_metadata,
+    _NOROVIRUS_OUTPUT_COLS,
+    _NOROVIRUS_RE,
     _SC2_OUTPUT_COLS,
 )
 
@@ -213,6 +215,54 @@ def influenza(results, sequences_vqc, sequences_input, output_prefix, metadata):
         typer.echo(f"{type_dir}/{seg_dir}: {len(kept)} sequences - {out_dir}")
 
 
+def _norovirus_genogroup(virus: str) -> str:
+    """
+    Extract the genogroup (GI–GVI) from a Norovirus virus string.
+
+    Returns the genogroup in uppercase, e.g. ``'GII'``, or ``'unknown'``.
+    """
+    m = _NOROVIRUS_RE.search(virus)
+    return m.group(1).upper() if m else "unknown"
+
+
+@virus_app.command("norovirus")
+@common_virus_options
+def norovirus(results, sequences_vqc, sequences_input, output_prefix, metadata):
+    """Prepare NCBI submission packages for Norovirus (per genogroup GI–GVI)."""
+    df = load_results(results)
+    fasta = load_fasta(sequences_input)
+    fasta.update(load_fasta(sequences_vqc))
+    meta_df = load_metadata(metadata)
+
+    noro_mask = df["virus"].str.contains(
+        r"^Norovirus", case=False, regex=True, na=False
+    )
+    df_noro = df[noro_mask].copy()
+
+    if df_noro.empty:
+        typer.echo("No Norovirus sequences found in results.")
+        raise typer.Exit()
+
+    df_noro["_genogroup"] = df_noro["virus"].apply(_norovirus_genogroup)
+
+    for genogroup, group_df in df_noro.groupby("_genogroup"):
+        seq_names = set(group_df["seqName"].str.strip())
+        subset = {k: v for k, v in fasta.items() if k in seq_names}
+        kept, dropped = filter_sequences(subset, df)
+
+        rename_log: list = []
+        out_dir = Path(f"{output_prefix}_Norovirus") / genogroup
+        _build_package(out_dir, kept, dropped, rename_log, header_fn=lambda r: r.id)
+        write_submission_metadata(
+            kept, df, meta_df, out_dir / "metadata.csv", is_standard=True,
+            base_cols=_NOROVIRUS_OUTPUT_COLS,
+        )
+
+        typer.echo(
+            f"Norovirus {genogroup}: {len(kept)} sequences - {out_dir}"
+        )
+
+
 @virus_app.command("custom")
 def custom(
     results: Path = _RESULTS_OPTION,
@@ -223,7 +273,7 @@ def custom(
         None,
         "--metadata",
         help="Optional CSV with sample metadata (Sequence_ID, geo_loc_name, host, isolate, "
-        "collection-date, isolation-source). Only Sequence_ID and Organism are required "
+        "collection-date, isolation-source). Only Sequence_ID is required "
         "in the output; other columns are included when metadata is provided.",
     ),
     virus_name: str = typer.Option(
@@ -236,6 +286,12 @@ def custom(
         "--tbl-dir",
         help="Directory containing per-sample TBL files. "
         "When omitted, uses the tbl_path column from the results file.",
+    ),
+    split_by_segments: bool = typer.Option(
+        False,
+        "--split-by-segments",
+        help="Organize output into per-segment subdirectories when the virus "
+        "has annotated segments (e.g. S, M, L).",
     ),
 ):
     """Prepare an NCBI submission package for a custom (non-predefined) virus."""
@@ -265,41 +321,78 @@ def custom(
             organism = row.get("virus", virus_name)
         return f"{record.id} [Organism={organism}]"
 
-    rename_log: list = []
-    out_dir = Path(f"{output_prefix}_{_safe_dir_name(virus_name)}")
-    _build_package(out_dir, kept, dropped, rename_log, header_fn=header_fn)
+    base_out_dir = Path(f"{output_prefix}_{_safe_dir_name(virus_name)}")
 
-    first_row = row_lookup.get(kept[0].id, {}) if kept else {}
-    organism_label = str(
-        first_row.get("virus_species") or first_row.get("virus") or virus_name
-    )
-    write_submission_metadata(
-        kept,
-        df,
-        meta_df,
-        out_dir / "metadata.csv",
-        is_standard=False,
-        organism=organism_label,
+    # Group by segment only when --split-by-segments is set
+    has_segments = (
+        split_by_segments
+        and "segment" in df_custom.columns
+        and df_custom["segment"].dropna().str.strip().replace("", pd.NA).dropna().any()
     )
 
-    n_tbl = 0
-    tbl_out_dir = out_dir / "tbl_files"
+    if has_segments:
+        segment_groups = []
+        for seg_val, seg_df in df_custom.groupby("segment", dropna=False):
+            seg_str = str(seg_val).strip()
+            seg_safe = (
+                _safe_dir_name(seg_str) if seg_str and seg_str != "nan" else "unknown"
+            )
+            seg_ids = set(seg_df["seqName"].str.strip())
+            seg_kept = [r for r in kept if r.id in seg_ids]
+            seg_dropped = [d for d in dropped if d["seqName"] in seg_ids]
+            segment_groups.append((base_out_dir / seg_safe, seg_kept, seg_dropped))
+    else:
+        segment_groups = [(base_out_dir, kept, dropped)]
 
-    for record in kept:
-        row = row_lookup.get(record.id, {})
+    total_tbl = 0
+    for out_dir, seg_kept, seg_dropped in segment_groups:
+        if not seg_kept:
+            continue
 
-        if tbl_dir:
-            candidates = list(tbl_dir.glob(f"*_{record.id}.tbl"))
-            if not candidates:
-                candidates = list(tbl_dir.glob(f"*{re.escape(record.id)}*.tbl"))
-            if candidates:
-                if copy_tbl(
-                    str(candidates[0]), tbl_out_dir, dest_name=f"{record.id}.tbl"
-                ):
-                    n_tbl += 1
-        else:
-            tbl_path_str = row.get("tbl_path", "")
-            if copy_tbl(str(tbl_path_str), tbl_out_dir, dest_name=f"{record.id}.tbl"):
-                n_tbl += 1
+        rename_log: list = []
+        _build_package(out_dir, seg_kept, seg_dropped, rename_log, header_fn=header_fn)
 
-    typer.echo(f"{virus_name}: {len(kept)} sequences, {n_tbl} TBL files - {out_dir}")
+        first_row = row_lookup.get(seg_kept[0].id, {}) if seg_kept else {}
+        organism_label = str(
+            first_row.get("virus_species") or first_row.get("virus") or virus_name
+        )
+        write_submission_metadata(
+            seg_kept,
+            df,
+            meta_df,
+            out_dir / "metadata.tsv",
+            is_standard=False,
+            organism=organism_label,
+        )
+
+        tbl_parts: list[str] = []
+        for record in seg_kept:
+            row = row_lookup.get(record.id, {})
+            tbl_content = None
+
+            if tbl_dir:
+                candidates = list(tbl_dir.glob(f"*_{record.id}.tbl"))
+                if not candidates:
+                    candidates = list(tbl_dir.glob(f"*{re.escape(record.id)}*.tbl"))
+                if candidates:
+                    tbl_content = candidates[0].read_text(encoding="utf-8", errors="replace")
+            else:
+                tbl_path_str = str(row.get("tbl_path", "") or "").strip()
+                if tbl_path_str and tbl_path_str != "nan":
+                    src = Path(tbl_path_str)
+                    if src.exists():
+                        tbl_content = src.read_text(encoding="utf-8", errors="replace")
+
+            if tbl_content:
+                tbl_parts.append(tbl_content.rstrip("\n"))
+
+        n_tbl = len(tbl_parts)
+        total_tbl += n_tbl
+        if tbl_parts:
+            combined_tbl = out_dir / "annotation.tbl"
+            combined_tbl.write_text("\n".join(tbl_parts) + "\n", encoding="utf-8")
+
+        typer.echo(
+            f"{virus_name}{f'/{out_dir.name}' if has_segments else ''}: "
+            f"{len(seg_kept)} sequences, {n_tbl} TBL files - {out_dir}"
+        )
