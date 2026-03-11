@@ -18,7 +18,9 @@ Ambos os comandos requerem os arquivos de saída gerados pelo comando `viralQC r
 Ao usar o sub-comando `virus`, as sequências são agrupadas em diretórios específicos para o vírus ou segmento.
 
 ```bash
-vqc prepare-ncbi-submission virus [SUBCOMMAND] --results results.tsv --sequences sequences_target_regions.fasta
+vqc prepare-ncbi-submission virus [SUBCOMMAND] \
+    --results results.tsv \
+    --sequences sequences_target_regions.fasta
 ```
 
 ### Vírus Suportados
@@ -27,28 +29,44 @@ Para Dengue, Influenza, Norovírus e SARS-CoV-2, o NCBI possui requisitos espec�
 
 #### SARS-CoV-2
 ```bash
-vqc prepare-ncbi-submission virus sars-cov-2 --results results.tsv --sequences-vqc sequences_target_regions.fasta --sequences-input original_sequences.fasta --metadata input_metadata.csv
+vqc prepare-ncbi-submission virus sars-cov-2 \
+    --results results.tsv \
+    --sequences-vqc sequences_target_regions.fasta \
+    --sequences-input original_sequences.fasta \
+    --metadata input_metadata.csv
 ```
 
 Organiza todas as sequências de SARS-CoV-2 em `ncbi_submission_SARS-CoV-2/`.
 
 #### Dengue
 ```bash
-vqc prepare-ncbi-submission virus dengue --results results.tsv --sequences-vqc sequences_target_regions.fasta --sequences-input original_sequences.fasta --metadata input_metadata.csv
+vqc prepare-ncbi-submission virus dengue \
+    --results results.tsv \
+    --sequences-vqc sequences_target_regions.fasta \
+    --sequences-input original_sequences.fasta \
+    --metadata input_metadata.csv
 ```
 
 Organiza sequências por tipo, criando diretórios como `ncbi_submission_Dengue1/`, `ncbi_submission_Dengue2/`, etc., dependendo dos sorotipos identificados na análise do ViralQC.
 
 #### Influenza
 ```bash
-vqc prepare-ncbi-submission virus influenza --results results.tsv --sequences-vqc sequences_target_regions.fasta --sequences-input original_sequences.fasta --metadata input_metadata.csv
+vqc prepare-ncbi-submission virus influenza \
+    --results results.tsv \
+    --sequences-vqc sequences_target_regions.fasta \
+    --sequences-input original_sequences.fasta \
+    --metadata input_metadata.csv
 ```
 
 Organiza sequências por tipo com subdiretórios para cada segmento, criando diretórios como `ncbi_submission_InfluenzaA/HA/`, `ncbi_submission_InfluenzaA/NA/`, `ncbi_submission_InfluenzaB/HA/`, etc.
 
 #### Norovírus
 ```bash
-vqc prepare-ncbi-submission virus norovirus --results results.tsv --sequences-vqc sequences_target_regions.fasta --sequences-input original_sequences.fasta --metadata input_metadata.csv
+vqc prepare-ncbi-submission virus norovirus \
+    --results results.tsv \
+    --sequences-vqc sequences_target_regions.fasta \
+    --sequences-input original_sequences.fasta \
+    --metadata input_metadata.csv
 ```
 
 Organiza sequências por genogrupo, criando subdiretórios como `ncbi_submission_Norovirus/GI/`, `ncbi_submission_Norovirus/GII/`, etc., dependendo dos genogrupos identificados na análise do ViralQC. Os genogrupos suportados vão de GI a GVI.
