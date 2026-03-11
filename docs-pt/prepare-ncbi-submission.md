@@ -141,3 +141,140 @@ O NCBI limita submissões a 3.000 sequências por arquivo. Quando um grupo de v�
 * …e assim por diante.
 
 Se um grupo tiver 2.999 ou menos sequências, os arquivos são escritos normalmente sem nenhum sufixo.
+
+## API Python
+
+A lógica de preparo também está disponível como uma classe Python, `PrepareSubmission`, para uso em scripts ou pipelines de terceiros. Em vez de ler metadados de um arquivo CSV, a classe aceita uma lista de dicionários Python.
+
+### Instalação
+
+A classe está disponível após instalar o pacote `viralqc`. Nenhuma dependência adicional é necessária.
+
+```python
+from viralqc.core import PrepareSubmission
+```
+
+### Construtor
+
+```python
+PrepareSubmission(
+    viralqc_results,      # Path – arquivo de resultados do ViralQC (.tsv, .csv ou .json)
+    viralqc_target_seq,   # Path – sequences_target_regions.fasta gerado pelo vqc run
+    viralqc_input_seq,    # Path – FASTA de entrada original passado ao vqc run
+    samples_metadata,     # list[dict] – metadados das amostras (veja abaixo)
+    output_prefix="ncbi_submission",  # str  – prefixo para os diretórios de saída
+    split_by_segments=False,          # bool – dividir vírus personalizados por segmento
+    tbl_dir=None,                     # Path|None – pasta com arquivos .tbl por amostra
+)
+```
+
+Cada dicionário em `samples_metadata` utiliza as seguintes chaves:
+
+| Chave | Descrição | Vírus padrão | Vírus personalizados |
+|-------|-----------|--------------|----------------------|
+| `sample_id` | Deve corresponder exatamente ao `seqName`. **Máximo 24 caracteres.** | **Obrigatório** | **Obrigatório** |
+| `country` | Localização geográfica (mapeado para `geo_loc_name`). | **Obrigatório** | Opcional |
+| `host` | Hospedeiro natural (ex: `Homo sapiens`). | **Obrigatório** | Opcional |
+| `isolate` | Nome ou identificador do isolado. | **Obrigatório** | Opcional |
+| `collection-date` | Data de coleta (`AAAA-MM-DD`). | **Obrigatório** | Opcional |
+| `isolation-source` | Material de origem (ex: `Soro`). | **Obrigatório** | Opcional |
+
+### Métodos
+
+#### `run_virus(virus="all", virus_name=None)`
+
+Prepara pacotes de submissão agrupados por tipo de vírus. Equivalente a `vqc prepare-ncbi-submission virus <subcomando>`.
+
+- `virus`: `"all"` (padrão), `"sars-cov-2"`, `"dengue"`, `"influenza"`, `"norovirus"` ou `"custom"`.
+- `virus_name`: obrigatório quando `virus="custom"`.
+
+#### `run_sample(samples=["all"])`
+
+Prepara pacotes para amostras específicas ou todas as amostras. Equivalente a `vqc prepare-ncbi-submission sample`.
+
+- `samples`: lista de IDs de amostras, ou `["all"]` para processar todas.
+
+### Valor de Retorno
+
+Ambos os métodos retornam uma lista de dicionários, uma entrada por diretório de saída gerado:
+
+```python
+[
+    {
+        "SARS-CoV-2": {
+            "sequences":  [Path("ncbi_submission_SARS-CoV-2/sequences.fasta")],
+            "metadata":   [Path("ncbi_submission_SARS-CoV-2/metadata.csv")],
+            "log":         Path("ncbi_submission_SARS-CoV-2/summary.txt"),
+        }
+    },
+    {
+        "Oropouche virus": {
+            "sequences":  [Path("ncbi_submission_Oropouche_virus/sequences.fasta")],
+            "metadata":   [Path("ncbi_submission_Oropouche_virus/metadata.tsv")],
+            "log":         Path("ncbi_submission_Oropouche_virus/summary.txt"),
+            "annotation": [Path("ncbi_submission_Oropouche_virus/annotation.tbl")],
+        }
+    },
+]
+```
+
+A chave `"annotation"` está presente apenas para vírus personalizados que possuem arquivos TBL.
+
+Para vírus organizados em subdiretórios (segmentos do Influenza, genogrupos do Norovírus, vírus personalizados com `split_by_segments=True`), cada subdiretório gera sua própria entrada. O rótulo usa o formato `"Tipo/Subgrupo"`, ex: `"InfluenzaA/HA"` ou `"Norovirus/GII"`.
+
+### Exemplos
+
+#### Processar todos os vírus encontrados no arquivo de resultados
+
+```python
+from pathlib import Path
+from viralqc.core import PrepareSubmission
+
+ps = PrepareSubmission(
+    viralqc_results=Path("results.tsv"),
+    viralqc_target_seq=Path("sequences_target_regions.fasta"),
+    viralqc_input_seq=Path("sequences.fasta"),
+    samples_metadata=[
+        {
+            "sample_id": "S001",
+            "country": "Brasil",
+            "host": "Homo sapiens",
+            "isolate": "isolate/S001/2024",
+            "collection-date": "2024-01-01",
+            "isolation-source": "Soro",
+        },
+    ],
+)
+
+resultados = ps.run_virus()  # processa todos os grupos de vírus
+for entrada in resultados:
+    for rotulo, arquivos in entrada.items():
+        print(f"{rotulo}:")
+        for seq in arquivos["sequences"]:
+            print(f"  sequências → {seq}")
+        for meta in arquivos["metadata"]:
+            print(f"  metadados  → {meta}")
+        if "annotation" in arquivos:
+            for ann in arquivos["annotation"]:
+                print(f"  anotação   → {ann}")
+```
+
+#### Processar apenas amostras específicas
+
+```python
+resultados = ps.run_sample(samples=["S001"])
+```
+
+#### Processar vírus personalizado com divisão por segmentos
+
+```python
+ps = PrepareSubmission(
+    viralqc_results=Path("results.tsv"),
+    viralqc_target_seq=Path("sequences_target_regions.fasta"),
+    viralqc_input_seq=Path("sequences.fasta"),
+    samples_metadata=[...],
+    split_by_segments=True,
+)
+resultados = ps.run_virus(virus="custom", virus_name="Oropouche virus")
+# Gera ncbi_submission_Oropouche_virus/S/, /M/, /L/
+```

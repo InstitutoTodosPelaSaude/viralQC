@@ -141,3 +141,148 @@ NCBI limits submissions to 3,000 sequences per file. When a virus group exceeds 
 * …and so on.
 
 If a group has 2,999 or fewer sequences, the files are written normally without any suffix.
+
+## Python API
+
+The preparation logic is also available as an importable Python class, `PrepareSubmission`, for use in third-party scripts or pipelines. Instead of reading metadata from a CSV file, the class accepts a list of Python dicts.
+
+### Installation
+
+The class is available after installing `viralqc` as a package. No additional dependencies are required.
+
+```python
+from viralqc.core import PrepareSubmission
+```
+
+### Constructor
+
+```python
+PrepareSubmission(
+    viralqc_results,      # Path – ViralQC results file (.tsv, .csv or .json)
+    viralqc_target_seq,   # Path – sequences_target_regions.fasta produced by vqc run
+    viralqc_input_seq,    # Path – original input FASTA passed to vqc run
+    samples_metadata,     # list[dict] – sample metadata (see below)
+    output_prefix="ncbi_submission",  # str  – prefix for output directories
+    split_by_segments=False,          # bool – split custom viruses by segment
+    tbl_dir=None,                     # Path|None – folder with per-sample .tbl files
+)
+```
+
+Each dict in `samples_metadata` uses the following keys:
+
+| Key | Description | Standard viruses | Custom viruses |
+|-----|-------------|-----------------|----------------|
+| `sample_id` | Must match `seqName` exactly. **Max 24 characters.** | **Required** | **Required** |
+| `country` | Geographic location (maps to `geo_loc_name`). | **Required** | Optional |
+| `host` | Natural host (e.g. `Homo sapiens`). | **Required** | Optional |
+| `isolate` | Isolate name or identifier. | **Required** | Optional |
+| `collection-date` | Collection date (`YYYY-MM-DD`). | **Required** | Optional |
+| `isolation-source` | Source material (e.g. `Serum`). | **Required** | Optional |
+
+### Methods
+
+#### `run_virus(virus="all", virus_name=None)`
+
+Prepares submission packages grouped by virus type. Equivalent to `vqc prepare-ncbi-submission virus <subcommand>`.
+
+- `virus`: `"all"` (default), `"sars-cov-2"`, `"dengue"`, `"influenza"`, `"norovirus"`, or `"custom"`.
+- `virus_name`: required when `virus="custom"`.
+
+#### `run_sample(samples=["all"])`
+
+Prepares packages for specific samples or all samples. Equivalent to `vqc prepare-ncbi-submission sample`.
+
+- `samples`: a list of sample IDs, or `["all"]` to process every sample.
+
+### Return Value
+
+Both methods return a list of dicts, one entry per generated output directory:
+
+```python
+[
+    {
+        "SARS-CoV-2": {
+            "sequences":  [Path("ncbi_submission_SARS-CoV-2/sequences.fasta")],
+            "metadata":   [Path("ncbi_submission_SARS-CoV-2/metadata.csv")],
+            "log":         Path("ncbi_submission_SARS-CoV-2/summary.txt"),
+        }
+    },
+    {
+        "Oropouche virus": {
+            "sequences":  [Path("ncbi_submission_Oropouche_virus/sequences.fasta")],
+            "metadata":   [Path("ncbi_submission_Oropouche_virus/metadata.tsv")],
+            "log":         Path("ncbi_submission_Oropouche_virus/summary.txt"),
+            "annotation": [Path("ncbi_submission_Oropouche_virus/annotation.tbl")],
+        }
+    },
+]
+```
+
+The `"annotation"` key is only present for custom viruses that have TBL files.
+
+For viruses organized into subdirectories (Influenza segments, Norovirus genogroups, custom viruses with `split_by_segments=True`), each subdirectory produces its own entry. The label uses a `"Type/Subgroup"` format, e.g. `"InfluenzaA/HA"` or `"Norovirus/GII"`.
+
+### Examples
+
+#### Process all viruses found in the results file
+
+```python
+from pathlib import Path
+from viralqc.core import PrepareSubmission
+
+ps = PrepareSubmission(
+    viralqc_results=Path("results.tsv"),
+    viralqc_target_seq=Path("sequences_target_regions.fasta"),
+    viralqc_input_seq=Path("sequences.fasta"),
+    samples_metadata=[
+        {
+            "sample_id": "S001",
+            "country": "Brazil",
+            "host": "Homo sapiens",
+            "isolate": "isolate/S001/2024",
+            "collection-date": "2024-01-01",
+            "isolation-source": "Serum",
+        },
+        {
+            "sample_id": "S002",
+            "country": "Colombia",
+            "host": "Homo sapiens",
+            "isolate": "isolate/S002/2024",
+            "collection-date": "2024-02-15",
+            "isolation-source": "Nasopharyngeal swab",
+        },
+    ],
+)
+
+results = ps.run_virus()  # process all virus groups
+for entry in results:
+    for virus_label, files in entry.items():
+        print(f"{virus_label}:")
+        for seq_path in files["sequences"]:
+            print(f"  sequences → {seq_path}")
+        for meta_path in files["metadata"]:
+            print(f"  metadata  → {meta_path}")
+        if "annotation" in files:
+            for ann_path in files["annotation"]:
+                print(f"  annotation → {ann_path}")
+```
+
+#### Process only specific sample IDs
+
+```python
+results = ps.run_sample(samples=["S001"])
+```
+
+#### Process a custom virus with segment splitting
+
+```python
+ps = PrepareSubmission(
+    viralqc_results=Path("results.tsv"),
+    viralqc_target_seq=Path("sequences_target_regions.fasta"),
+    viralqc_input_seq=Path("sequences.fasta"),
+    samples_metadata=[...],
+    split_by_segments=True,
+)
+results = ps.run_virus(virus="custom", virus_name="Oropouche virus")
+# Produces ncbi_submission_Oropouche_virus/S/, /M/, /L/ subdirectories
+```

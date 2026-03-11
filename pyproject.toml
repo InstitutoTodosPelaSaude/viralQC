@@ -50,3 +50,7 @@ viralqc = ["config/datasets.yml"]
 
 [project.urls]
 Homepage = "https://github.com/InstitutoTodosPelaSaude/viralQC"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"

@@ -36,9 +36,7 @@ PLAIN_HEADER_VIRUSES = frozenset(
 
 _INFLUENZA_RE = re.compile(r"^Influenza\s+(A|B|C)", re.IGNORECASE)
 _DENGUE_RE = re.compile(r"Dengue virus type\s+(\d)", re.IGNORECASE)
-_NOROVIRUS_RE = re.compile(
-    r"^Norovirus\b.*?(G(?:VI|V|IV|III|II|I))\b", re.IGNORECASE
-)
+_NOROVIRUS_RE = re.compile(r"^Norovirus\b.*?(G(?:VI|V|IV|III|II|I))\b", re.IGNORECASE)
 # Characters forbidden in FASTA headers / filenames
 _UNSAFE_RE = re.compile(r"[^\x00-\x7F]|[|/\\\s]")
 
@@ -233,7 +231,9 @@ def write_fasta(
     for i in range(0, len(records), NCBI_BATCH_SIZE):
         batch = records[i : i + NCBI_BATCH_SIZE]
         batch_idx = i // NCBI_BATCH_SIZE + 1
-        _write_fasta_single(batch, _batch_path(out_path, batch_idx), header_fn, rename_log)
+        _write_fasta_single(
+            batch, _batch_path(out_path, batch_idx), header_fn, rename_log
+        )
         logger.info(
             "Batch %d: %d sequences written to %s",
             batch_idx,

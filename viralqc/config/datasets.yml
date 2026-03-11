@@ -413,6 +413,97 @@ nextclade_data:
     ncbi_id: "CY115158.1"
     target_gene: "PB2"
     target_regions: ["PB2"]
+  flu-b-ha:
+    dataset: "nextstrain/flu/b/ha/KX058884"
+    tag: "2026-01-14--08-53-00Z"
+    virus_name: "Influenza B"
+    virus_tax_id: 11520
+    virus_species: "Betainfluenzavirus influenzae"
+    virus_species_tax_id: 2955465
+    segment: "HA"
+    ncbi_id: "KX058884.1"
+    target_gene: "HA1"
+    target_regions: ["HA1", "SigPep"]
+    private_mutation_total_threshold: 10
+  flu-b-na:
+    dataset: "nextstrain/flu/b/na/CY073894"
+    tag: "2026-01-14--08-53-00Z"
+    virus_name: "Influenza B"
+    virus_tax_id: 11520
+    virus_species: "Betainfluenzavirus influenzae"
+    virus_species_tax_id: 2955465
+    segment: "NA"
+    ncbi_id: "CY073894.1"
+    target_gene: "NA"
+    target_regions: ["NA"]
+    private_mutation_total_threshold: 10
+  flu-b-mp:
+    dataset: "nextstrain/flu/b/mp"
+    tag: "2026-01-14--08-53-00Z"
+    virus_name: "Influenza B"
+    virus_tax_id: 11520
+    virus_species: "Betainfluenzavirus influenzae"
+    virus_species_tax_id: 2955465
+    segment: "MP"
+    ncbi_id: "CY115152.1"
+    target_gene: "M1"
+    target_regions: ["M1", "BM2"]
+    private_mutation_total_threshold: 10
+  flu-b-np:
+    dataset: "nextstrain/flu/b/np"
+    tag: "2026-01-14--08-53-00Z"
+    virus_name: "Influenza B"
+    virus_tax_id: 11520
+    virus_species: "Betainfluenzavirus influenzae"
+    virus_species_tax_id: 2955465
+    segment: "NP"
+    ncbi_id: "CY115154.1"
+    target_gene: "NP"
+    target_regions: ["NP"]
+  flu-b-ns:
+    dataset: "nextstrain/flu/b/ns"
+    tag: "2026-01-14--08-53-00Z"
+    virus_name: "Influenza B"
+    virus_tax_id: 11520
+    virus_species: "Betainfluenzavirus influenzae"
+    virus_species_tax_id: 2955465
+    segment: "NS"
+    ncbi_id: "CY115155.1"
+    target_gene: "NS1"
+    target_regions: ["NEP", "NS1"]
+  flu-b-pa:
+    dataset: "nextstrain/flu/b/pa"
+    tag: "2026-01-14--08-53-00Z"
+    virus_name: "Influenza B"
+    virus_tax_id: 11520
+    virus_species: "Betainfluenzavirus influenzae"
+    virus_species_tax_id: 2955465
+    segment: "PA"
+    ncbi_id: "CY115156.1"
+    target_gene: "PA"
+    target_regions: ["PA"]
+  flu-b-pb1:
+    dataset: "nextstrain/flu/b/pb1"
+    tag: "2026-01-14--08-53-00Z"
+    virus_name: "Influenza B"
+    virus_tax_id: 11520
+    virus_species: "Betainfluenzavirus influenzae"
+    virus_species_tax_id: 2955465
+    segment: "PB1"
+    ncbi_id: "CY115157.1"
+    target_gene: "PB1"
+    target_regions: ["PB1"]
+  flu-b-pb2:
+    dataset: "nextstrain/flu/b/pb2"
+    tag: "2026-01-14--08-53-00Z"
+    virus_name: "Influenza B"
+    virus_tax_id: 11520
+    virus_species: "Betainfluenzavirus influenzae"
+    virus_species_tax_id: 2955465
+    segment: "PB2"
+    ncbi_id: "CY115158.1"
+    target_gene: "PB2"
+    target_regions: ["PB2"]
   chikv:
     dataset: "community/v-gen-lab/chikV/genotypes"
     tag: "2025-09-24--07-29-03Z"
