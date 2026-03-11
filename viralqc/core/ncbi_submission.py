@@ -239,9 +239,7 @@ def deduplicate_case_insensitive(
                 f"Case-insensitive duplicate of '{seen[lower_id]}' "
                 f"(NCBI treats IDs as case-insensitive)"
             )
-            logger.warning(
-                "Dropping '%s' — %s", ncbi_id, reason
-            )
+            logger.warning("Dropping '%s' — %s", ncbi_id, reason)
             if dropped_log is not None:
                 dropped_log.append({"seqName": rec.id, "reason": reason})
         else:
@@ -282,7 +280,9 @@ def write_fasta(
             drop events to (dicts with ``seqName`` and ``reason`` keys).
     """
     # Deduplicate case-insensitively before any writing
-    records = deduplicate_case_insensitive(records, header_fn=header_fn, dropped_log=dropped_log)
+    records = deduplicate_case_insensitive(
+        records, header_fn=header_fn, dropped_log=dropped_log
+    )
 
     if not records:
         return
@@ -683,4 +683,3 @@ def write_submission_metadata(
                 batch_path,
                 len(batch),
             )
-

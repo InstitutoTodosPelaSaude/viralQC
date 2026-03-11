@@ -14,6 +14,7 @@ import pytest
 # Generic helpers
 # ---------------------------------------------------------------------------
 
+
 def make_fasta(tmp_path: Path, filename: str, records: list[tuple[str, str]]) -> Path:
     """Write a minimal FASTA file. records is a list of (header, sequence)."""
     p = tmp_path / filename
@@ -25,7 +26,9 @@ def make_fasta(tmp_path: Path, filename: str, records: list[tuple[str, str]]) ->
     return p
 
 
-def make_results_tsv(tmp_path: Path, rows: list[dict], filename: str = "results.tsv") -> Path:
+def make_results_tsv(
+    tmp_path: Path, rows: list[dict], filename: str = "results.tsv"
+) -> Path:
     """Write a minimal ViralQC results TSV file."""
     p = tmp_path / filename
     df = pd.DataFrame(rows)
@@ -33,7 +36,9 @@ def make_results_tsv(tmp_path: Path, rows: list[dict], filename: str = "results.
     return p
 
 
-def make_metadata_csv(tmp_path: Path, rows: list[dict], filename: str = "metadata.csv") -> Path:
+def make_metadata_csv(
+    tmp_path: Path, rows: list[dict], filename: str = "metadata.csv"
+) -> Path:
     """Write a minimal metadata CSV file."""
     p = tmp_path / filename
     df = pd.DataFrame(rows)
@@ -61,18 +66,32 @@ BAD_SEQ = "N" * 300  # 100% N → fails filter
 @pytest.fixture()
 def tmp_fasta(tmp_path):
     """Return a FASTA file with two passing sequences."""
-    return make_fasta(tmp_path, "seqs.fasta", [
-        ("S001", GOOD_SEQ),
-        ("S002", GOOD_SEQ),
-    ])
+    return make_fasta(
+        tmp_path,
+        "seqs.fasta",
+        [
+            ("S001", GOOD_SEQ),
+            ("S002", GOOD_SEQ),
+        ],
+    )
 
 
 @pytest.fixture()
 def tmp_results(tmp_path):
     """Return a minimal TSV results file for SARS-CoV-2."""
     rows = [
-        {"seqName": "S001", "virus": "SARS-CoV-2", "clade": "21L", "virus_species": "SARS-CoV-2"},
-        {"seqName": "S002", "virus": "SARS-CoV-2", "clade": "21L", "virus_species": "SARS-CoV-2"},
+        {
+            "seqName": "S001",
+            "virus": "SARS-CoV-2",
+            "clade": "21L",
+            "virus_species": "SARS-CoV-2",
+        },
+        {
+            "seqName": "S002",
+            "virus": "SARS-CoV-2",
+            "clade": "21L",
+            "virus_species": "SARS-CoV-2",
+        },
     ]
     return make_results_tsv(tmp_path, rows)
 

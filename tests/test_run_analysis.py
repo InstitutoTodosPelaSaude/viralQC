@@ -72,11 +72,15 @@ class TestRun:
         fake_response = MagicMock(success=True)
         mock_snakemake.return_value = fake_response
 
-        result = self.ra.run(sequences_fasta=fasta, output_file=tmp_path / "results.tsv")
+        result = self.ra.run(
+            sequences_fasta=fasta, output_file=tmp_path / "results.tsv"
+        )
         assert result is fake_response
 
     @patch("viralqc.core.run_analysis.run_snakemake")
-    def test_invalid_output_format_raises_before_snakemake(self, mock_snakemake, tmp_path):
+    def test_invalid_output_format_raises_before_snakemake(
+        self, mock_snakemake, tmp_path
+    ):
         fasta = self._mock_fasta(tmp_path)
 
         with pytest.raises(InvalidOutputFormat):

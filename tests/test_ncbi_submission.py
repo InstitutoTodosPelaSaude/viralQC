@@ -27,7 +27,13 @@ from viralqc.core.ncbi_submission import (
     write_rename_log,
     write_submission_metadata,
 )
-from tests.conftest import GOOD_SEQ, BAD_SEQ, make_fasta, make_metadata_csv, make_results_tsv
+from tests.conftest import (
+    GOOD_SEQ,
+    BAD_SEQ,
+    make_fasta,
+    make_metadata_csv,
+    make_results_tsv,
+)
 
 
 # ── sanitize_seq_name ────────────────────────────────────────────────────────
@@ -295,25 +301,31 @@ class TestCopyTbl:
 
 
 class TestIsPlainHeaderVirus:
-    @pytest.mark.parametrize("virus", [
-        "SARS-CoV-2",
-        "Dengue virus type 1",
-        "Dengue virus type 4",
-        "Influenza A H1N1",
-        "Influenza A H3N2",
-        "Influenza B virus (B/Lee/1940)",
-        "Influenza C virus (C/Ann Arbor/1/50)",
-        "Norovirus GI",
-        "Norovirus GII",
-    ])
+    @pytest.mark.parametrize(
+        "virus",
+        [
+            "SARS-CoV-2",
+            "Dengue virus type 1",
+            "Dengue virus type 4",
+            "Influenza A H1N1",
+            "Influenza A H3N2",
+            "Influenza B virus (B/Lee/1940)",
+            "Influenza C virus (C/Ann Arbor/1/50)",
+            "Norovirus GI",
+            "Norovirus GII",
+        ],
+    )
     def test_standard_viruses(self, virus):
         assert is_plain_header_virus(virus) is True
 
-    @pytest.mark.parametrize("virus", [
-        "Oropouche virus",
-        "Respiratory syncytial virus A",
-        "Rhinovirus A",
-    ])
+    @pytest.mark.parametrize(
+        "virus",
+        [
+            "Oropouche virus",
+            "Respiratory syncytial virus A",
+            "Rhinovirus A",
+        ],
+    )
     def test_custom_viruses(self, virus):
         assert is_plain_header_virus(virus) is False
 
@@ -352,14 +364,16 @@ class TestSerotypeFields:
 
 class TestLoadMetadata:
     def test_valid_metadata_loads(self, tmp_path):
-        rows = [{
-            "Sequence_ID": "S001",
-            "geo_loc_name": "Brazil",
-            "host": "Homo sapiens",
-            "isolate": "S001/2024",
-            "collection-date": "2024-01-01",
-            "isolation-source": "Serum",
-        }]
+        rows = [
+            {
+                "Sequence_ID": "S001",
+                "geo_loc_name": "Brazil",
+                "host": "Homo sapiens",
+                "isolate": "S001/2024",
+                "collection-date": "2024-01-01",
+                "isolation-source": "Serum",
+            }
+        ]
         p = make_metadata_csv(tmp_path, rows)
         df = load_metadata(p, is_standard=True)
         assert len(df) == 1
@@ -371,14 +385,16 @@ class TestLoadMetadata:
             load_metadata(p, is_standard=True)
 
     def test_long_sequence_id_raises(self, tmp_path):
-        rows = [{
-            "Sequence_ID": "X" * 25,  # ≥25 chars → invalid
-            "geo_loc_name": "Brazil",
-            "host": "Homo sapiens",
-            "isolate": "iso",
-            "collection-date": "2024-01-01",
-            "isolation-source": "Serum",
-        }]
+        rows = [
+            {
+                "Sequence_ID": "X" * 25,  # ≥25 chars → invalid
+                "geo_loc_name": "Brazil",
+                "host": "Homo sapiens",
+                "isolate": "iso",
+                "collection-date": "2024-01-01",
+                "isolation-source": "Serum",
+            }
+        ]
         p = make_metadata_csv(tmp_path, rows)
         with pytest.raises(ValueError, match="less than 25"):
             load_metadata(p, is_standard=True)
@@ -415,42 +431,55 @@ class TestWriteSubmissionMetadata:
         # The function should return early without creating the output file
         assert not out.exists()
 
-
     def test_custom_virus_tsv_written(self, tmp_path):
-        results = pd.DataFrame([{
-            "seqName": "S001",
-            "virus": "Oropouche virus",
-            "clade": "",
-            "virus_species": "Oropouche virus",
-        }])
-        meta = pd.DataFrame([{
-            "Sequence_ID": "S001",
-            "geo_loc_name": "Brazil",
-            "host": "Homo sapiens",
-            "isolate": "iso/2024",
-            "collection-date": "2024-01-01",
-            "isolation-source": "Serum",
-        }])
+        results = pd.DataFrame(
+            [
+                {
+                    "seqName": "S001",
+                    "virus": "Oropouche virus",
+                    "clade": "",
+                    "virus_species": "Oropouche virus",
+                }
+            ]
+        )
+        meta = pd.DataFrame(
+            [
+                {
+                    "Sequence_ID": "S001",
+                    "geo_loc_name": "Brazil",
+                    "host": "Homo sapiens",
+                    "isolate": "iso/2024",
+                    "collection-date": "2024-01-01",
+                    "isolation-source": "Serum",
+                }
+            ]
+        )
         records = self._make_records(["S001"])
         out = tmp_path / "metadata.tsv"
-        write_submission_metadata(records, results, meta, out, is_standard=False, organism="Oropouche virus")
+        write_submission_metadata(
+            records, results, meta, out, is_standard=False, organism="Oropouche virus"
+        )
         assert out.exists()
         result = pd.read_csv(out, sep="\t")
         assert "Sequence_ID" in result.columns
 
     def test_standard_optional_cols_passed_through(self, tmp_path, tmp_results):
         """Optional INSDC columns present in the input CSV appear in output."""
-        meta = pd.DataFrame([{
-            "Sequence_ID": "S001",
-            "geo_loc_name": "Brazil",
-            "host": "Homo sapiens",
-            "isolate": "iso/2024",
-            "collection-date": "2024-01-01",
-            "isolation-source": "Serum",
-            "lat_lon": "15.77 S 47.93 W",
-            "strain": "B/2024",
-            "note": "acute case",
-        }])
+        meta = pd.DataFrame(
+            [
+                {
+                    "Sequence_ID": "S001",
+                    "geo_loc_name": "Brazil",
+                    "host": "Homo sapiens",
+                    "isolate": "iso/2024",
+                    "collection-date": "2024-01-01",
+                    "isolation-source": "Serum",
+                    "lat_lon": "15.77 S 47.93 W",
+                    "strain": "B/2024",
+                    "note": "acute case",
+                }
+            ]
+        )
         df = load_results(tmp_results)
         records = self._make_records(["S001"])
         out = tmp_path / "metadata.csv"
@@ -463,23 +492,31 @@ class TestWriteSubmissionMetadata:
 
     def test_custom_optional_cols_renamed_and_passed_through(self, tmp_path):
         """Optional columns for custom viruses are renamed to BankIt Title_Case."""
-        results = pd.DataFrame([{
-            "seqName": "S001",
-            "virus": "Oropouche virus",
-            "clade": "",
-            "virus_species": "Oropouche virus",
-        }])
-        meta = pd.DataFrame([{
-            "Sequence_ID": "S001",
-            "geo_loc_name": "Brazil",
-            "host": "Homo sapiens",
-            "isolate": "iso/2024",
-            "collection-date": "2024-01-01",
-            "isolation-source": "Serum",
-            "lat_lon": "15.77 S 47.93 W",
-            "strain": "OROV/2024",
-            "note": "febrile",
-        }])
+        results = pd.DataFrame(
+            [
+                {
+                    "seqName": "S001",
+                    "virus": "Oropouche virus",
+                    "clade": "",
+                    "virus_species": "Oropouche virus",
+                }
+            ]
+        )
+        meta = pd.DataFrame(
+            [
+                {
+                    "Sequence_ID": "S001",
+                    "geo_loc_name": "Brazil",
+                    "host": "Homo sapiens",
+                    "isolate": "iso/2024",
+                    "collection-date": "2024-01-01",
+                    "isolation-source": "Serum",
+                    "lat_lon": "15.77 S 47.93 W",
+                    "strain": "OROV/2024",
+                    "note": "febrile",
+                }
+            ]
+        )
         records = self._make_records(["S001"])
         out = tmp_path / "metadata.tsv"
         write_submission_metadata(records, results, meta, out, is_standard=False)
@@ -493,15 +530,19 @@ class TestWriteSubmissionMetadata:
 
     def test_unknown_cols_not_passed_through(self, tmp_path, tmp_results):
         """Columns not in either NCBI modifier list are silently excluded."""
-        meta = pd.DataFrame([{
-            "Sequence_ID": "S001",
-            "geo_loc_name": "Brazil",
-            "host": "Homo sapiens",
-            "isolate": "iso/2024",
-            "collection-date": "2024-01-01",
-            "isolation-source": "Serum",
-            "foo_bar": "should_be_ignored",
-        }])
+        meta = pd.DataFrame(
+            [
+                {
+                    "Sequence_ID": "S001",
+                    "geo_loc_name": "Brazil",
+                    "host": "Homo sapiens",
+                    "isolate": "iso/2024",
+                    "collection-date": "2024-01-01",
+                    "isolation-source": "Serum",
+                    "foo_bar": "should_be_ignored",
+                }
+            ]
+        )
         df = load_results(tmp_results)
         records = self._make_records(["S001"])
         out = tmp_path / "metadata.csv"
@@ -556,7 +597,9 @@ class TestDeduplicateCaseInsensitive:
         records = [self._rec("s1"), self._rec("S1")]
         header_fn = lambda r: r.id.lower()  # both map to "s1"
         log = []
-        result = deduplicate_case_insensitive(records, header_fn=header_fn, dropped_log=log)
+        result = deduplicate_case_insensitive(
+            records, header_fn=header_fn, dropped_log=log
+        )
         assert len(result) == 1
         assert len(log) == 1
 

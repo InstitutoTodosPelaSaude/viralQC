@@ -194,9 +194,7 @@ class TestLoadIdMapping:
 class TestParseTblBlocks:
     def test_yields_blocks(self, tmp_path):
         tbl = tmp_path / "test.tbl"
-        tbl.write_text(
-            ">Feature 1\n1\t100\tgene\n>Feature 2\n200\t300\tgene\n"
-        )
+        tbl.write_text(">Feature 1\n1\t100\tgene\n>Feature 2\n200\t300\tgene\n")
         blocks = list(parse_tbl_blocks(tbl))
         assert len(blocks) == 2
         assert blocks[0][0] == "1"
@@ -232,6 +230,7 @@ class TestCreateFastaPath:
 
     def test_nan_returns_none(self, tmp_path):
         import numpy as np
+
         tsv = tmp_path / "results.tsv"
         assert create_fasta_path(float("nan"), tsv, "sequences.fa") is None
 
@@ -254,14 +253,18 @@ class TestMapDatasetsToLocalPaths:
 class TestWriteUnmappedSequences:
     def _make_df(self, rows):
         import pandas as pd
+
         return pd.DataFrame(rows)
 
     def test_writes_unmapped(self, tmp_path):
         import pandas as pd
-        df = pd.DataFrame([
-            {"seqName": "S001", "dataset": "known", "localDataset": tmp_path},
-            {"seqName": "S002", "dataset": float("nan"), "localDataset": None},
-        ])
+
+        df = pd.DataFrame(
+            [
+                {"seqName": "S001", "dataset": "known", "localDataset": tmp_path},
+                {"seqName": "S002", "dataset": float("nan"), "localDataset": None},
+            ]
+        )
         write_unmapped_sequences(df, tmp_path)
         content = (tmp_path / "unmapped_sequences.txt").read_text()
         assert "S002" in content
@@ -269,9 +272,12 @@ class TestWriteUnmappedSequences:
 
     def test_writes_empty_file_when_all_mapped(self, tmp_path):
         import pandas as pd
-        df = pd.DataFrame([
-            {"seqName": "S001", "dataset": "ds", "localDataset": tmp_path},
-        ])
+
+        df = pd.DataFrame(
+            [
+                {"seqName": "S001", "dataset": "ds", "localDataset": tmp_path},
+            ]
+        )
         write_unmapped_sequences(df, tmp_path)
         content = (tmp_path / "unmapped_sequences.txt").read_text()
         assert content == ""
