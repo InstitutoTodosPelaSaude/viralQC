@@ -74,7 +74,11 @@ def _build_package(
     """Write sequences.fasta and renamed_headers.tsv."""
     out_dir.mkdir(parents=True, exist_ok=True)
     write_fasta(
-        records, out_dir / "sequences.fasta", header_fn=header_fn, rename_log=rename_log
+        records,
+        out_dir / "sequences.fasta",
+        header_fn=header_fn,
+        rename_log=rename_log,
+        dropped_log=dropped,
     )
     if rename_log:
         write_rename_log(rename_log, out_dir / "renamed_headers.tsv")
@@ -606,6 +610,7 @@ class PrepareSubmission:
                 out_dir / "sequences.fasta",
                 header_fn=header_fn,
                 rename_log=rename_log,
+                dropped_log=seg_dropped,
             )
 
             if meta_df is not None and not meta_df.empty:

@@ -15,6 +15,7 @@ from viralqc.core.ncbi_submission import (
     _n_fraction,
     _serotype_fields,
     copy_tbl,
+    deduplicate_case_insensitive,
     filter_sequences,
     is_plain_header_virus,
     load_fasta,
@@ -436,3 +437,137 @@ class TestWriteSubmissionMetadata:
         assert out.exists()
         result = pd.read_csv(out, sep="\t")
         assert "Sequence_ID" in result.columns
+
+    def test_standard_optional_cols_passed_through(self, tmp_path, tmp_results):
+        """Optional INSDC columns present in the input CSV appear in output."""
+        meta = pd.DataFrame([{
+            "Sequence_ID": "S001",
+            "geo_loc_name": "Brazil",
+            "host": "Homo sapiens",
+            "isolate": "iso/2024",
+            "collection-date": "2024-01-01",
+            "isolation-source": "Serum",
+            "lat_lon": "15.77 S 47.93 W",
+            "strain": "B/2024",
+            "note": "acute case",
+        }])
+        df = load_results(tmp_results)
+        records = self._make_records(["S001"])
+        out = tmp_path / "metadata.csv"
+        write_submission_metadata(records, df, meta, out, is_standard=True)
+        result = pd.read_csv(out)
+        assert "lat_lon" in result.columns
+        assert "strain" in result.columns
+        assert "note" in result.columns
+        assert result.iloc[0]["lat_lon"] == "15.77 S 47.93 W"
+
+    def test_custom_optional_cols_renamed_and_passed_through(self, tmp_path):
+        """Optional columns for custom viruses are renamed to BankIt Title_Case."""
+        results = pd.DataFrame([{
+            "seqName": "S001",
+            "virus": "Oropouche virus",
+            "clade": "",
+            "virus_species": "Oropouche virus",
+        }])
+        meta = pd.DataFrame([{
+            "Sequence_ID": "S001",
+            "geo_loc_name": "Brazil",
+            "host": "Homo sapiens",
+            "isolate": "iso/2024",
+            "collection-date": "2024-01-01",
+            "isolation-source": "Serum",
+            "lat_lon": "15.77 S 47.93 W",
+            "strain": "OROV/2024",
+            "note": "febrile",
+        }])
+        records = self._make_records(["S001"])
+        out = tmp_path / "metadata.tsv"
+        write_submission_metadata(records, results, meta, out, is_standard=False)
+        result = pd.read_csv(out, sep="\t")
+        assert "Lat_Lon" in result.columns
+        assert "Strain" in result.columns
+        assert "Note" in result.columns
+        assert result.iloc[0]["Strain"] == "OROV/2024"
+        # required columns also present
+        assert "Country (geo_loc_name)" in result.columns
+
+    def test_unknown_cols_not_passed_through(self, tmp_path, tmp_results):
+        """Columns not in either NCBI modifier list are silently excluded."""
+        meta = pd.DataFrame([{
+            "Sequence_ID": "S001",
+            "geo_loc_name": "Brazil",
+            "host": "Homo sapiens",
+            "isolate": "iso/2024",
+            "collection-date": "2024-01-01",
+            "isolation-source": "Serum",
+            "foo_bar": "should_be_ignored",
+        }])
+        df = load_results(tmp_results)
+        records = self._make_records(["S001"])
+        out = tmp_path / "metadata.csv"
+        write_submission_metadata(records, df, meta, out, is_standard=True)
+        result = pd.read_csv(out)
+        assert "foo_bar" not in result.columns
+
+
+# ── deduplicate_case_insensitive ──────────────────────────────────────────────
+
+
+class TestDeduplicateCaseInsensitive:
+    def _rec(self, id_):
+        return SeqRecord(Seq(GOOD_SEQ), id=id_)
+
+    def test_no_duplicates_unchanged(self):
+        records = [self._rec("S001"), self._rec("S002"), self._rec("S003")]
+        result = deduplicate_case_insensitive(records)
+        assert len(result) == 3
+
+    def test_exact_case_duplicate_kept_first(self):
+        records = [self._rec("S001"), self._rec("S001")]
+        result = deduplicate_case_insensitive(records)
+        assert len(result) == 1
+        assert result[0].id == "S001"
+
+    def test_case_insensitive_duplicate_dropped(self):
+        # ITpS_DLC_000zN_001 and ITpS_DLc_000zn_001 — same ID, different case
+        records = [self._rec("ITpS_DLC_000zN_001"), self._rec("ITpS_DLc_000zn_001")]
+        result = deduplicate_case_insensitive(records)
+        assert len(result) == 1
+        assert result[0].id == "ITpS_DLC_000zN_001"  # first one kept
+
+    def test_dropped_appended_to_log(self):
+        records = [self._rec("SEQ1"), self._rec("seq1")]
+        log = []
+        deduplicate_case_insensitive(records, dropped_log=log)
+        assert len(log) == 1
+        assert log[0]["seqName"] == "seq1"
+        assert "Case-insensitive duplicate" in log[0]["reason"]
+        assert "SEQ1" in log[0]["reason"]
+
+    def test_multiple_duplicates_all_logged(self):
+        records = [self._rec("A"), self._rec("a"), self._rec("A")]
+        log = []
+        result = deduplicate_case_insensitive(records, dropped_log=log)
+        assert len(result) == 1
+        assert len(log) == 2
+
+    def test_custom_header_fn_used(self):
+        # header_fn maps rec.id → "PREFIX_" + rec.id; collision on lowercase
+        records = [self._rec("s1"), self._rec("S1")]
+        header_fn = lambda r: r.id.lower()  # both map to "s1"
+        log = []
+        result = deduplicate_case_insensitive(records, header_fn=header_fn, dropped_log=log)
+        assert len(result) == 1
+        assert len(log) == 1
+
+    def test_write_fasta_drops_case_duplicates(self, tmp_path):
+        records = [self._rec("ITpS_DLC_000zN_001"), self._rec("ITpS_DLc_000zn_001")]
+        out = tmp_path / "out.fasta"
+        log = []
+        write_fasta(records, out, dropped_log=log)
+        content = out.read_text()
+        # Only the first ID should appear
+        assert "ITpS_DLC_000zN_001" in content
+        assert "ITpS_DLc_000zn_001" not in content
+        assert len(log) == 1
+        assert "Case-insensitive" in log[0]["reason"]

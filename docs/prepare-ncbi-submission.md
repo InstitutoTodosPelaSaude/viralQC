@@ -104,6 +104,8 @@ For all submission commands, you can (or must, for predefined viruses) provide a
 
 The input CSV can contain the following columns. Their necessity depends on the virus type being processed:
 
+#### Required Columns
+
 | Column | Description | Dengue, Influenza & Norovirus | SARS-CoV-2 | Custom Viruses |
 |--------|-------------|-------------------------------|------------|----------------|
 | `Sequence_ID` | Must match the `seqName` exactly as it appears in the results file and FASTA headers. **Must be less than 25 characters long.** | **Required** | **Required** | **Required** |
@@ -114,6 +116,64 @@ The input CSV can contain the following columns. Their necessity depends on the 
 | `isolation-source` | The source material of the sample (e.g., `Serum`, `Swab`). | **Required** | *Ignored* | Optional |
 
 *Note: For Custom viruses, creating the `--metadata` file itself is completely optional. If provided, only `Sequence_ID` must be present, and the other data columns will be included if you add them.*
+
+#### Optional Columns — Standard Viruses (Dengue, Influenza, Norovirus, SARS-CoV-2)
+
+Any of the following INSDC source modifiers can be added to the metadata CSV. If present, they will be automatically included in the output `metadata.csv`:
+
+| Column (CSV header) | Description |
+|---------------------|-------------|
+| `altitude` | Altitude in metres above or below sea level where the sample was collected. |
+| `collected_by` | Name of the person who collected the sample. |
+| `culture_collection` | Institution code and culture ID (format: `inst:coll:id`). |
+| `haplotype` | Haplotype of the organism. |
+| `lab_host` | Laboratory host used to propagate the organism. |
+| `lat_lon` | Latitude and longitude in decimal degrees (e.g., `15.77 S 47.93 W`). |
+| `note` | Any additional free-text information about the sequence. |
+| `segment` | Name of the viral or phage segment sequenced. |
+| `sex` | Sex of the organism from which the sequence was obtained. |
+| `specimen_voucher` | Institutional identifier for the source specimen. |
+| `strain` | Strain of the organism. |
+| `tissue_type` | Type of tissue from which the sequence was obtained. |
+
+#### Optional Columns — Custom Viruses
+
+For custom viruses the metadata is a tab-delimited file and the column names follow the BankIt Title_Case convention. The following columns can be added to the input CSV using the standard lower-case names — they will be automatically renamed in the output:
+
+| Input column | Output column | Description |
+|---|---|---|
+| `altitude` | `Altitude` | Altitude in metres. |
+| `bio_material` | `Bio_material` | Biological material identifier. |
+| `breed` | `Breed` | Named breed (usually for domesticated mammals). |
+| `cell_line` | `Cell_line` | Cell line from which the sequence was obtained. |
+| `cell_type` | `Cell_type` | Type of cell. |
+| `clone` | `Clone` | Clone from which the sequence was obtained. |
+| `collected_by` | `Collected_by` | Person who collected the sample. |
+| `culture_collection` | `Culture_collection` | Culture collection identifier. |
+| `dev_stage` | `Dev_stage` | Developmental stage of the organism. |
+| `ecotype` | `Ecotype` | Named ecotype. |
+| `fwd_primer_name` | `Fwd_primer_name` | Name of forward PCR primer. |
+| `fwd_primer_seq` | `Fwd_primer_seq` | Sequence of forward PCR primer. |
+| `genotype` | `Genotype` | Genotype of the organism. |
+| `haplogroup` | `Haplogroup` | Haplogroup of the organism. |
+| `haplotype` | `Haplotype` | Haplotype of the organism. |
+| `lab_host` | `Lab_host` | Laboratory host used to propagate the organism. |
+| `lat_lon` | `Lat_Lon` | Latitude and longitude in decimal degrees. |
+| `note` | `Note` | Free-text additional information. |
+| `rev_primer_name` | `Rev_primer_name` | Name of reverse PCR primer. |
+| `rev_primer_seq` | `Rev_primer_seq` | Sequence of reverse PCR primer. |
+| `segment` | `Segment` | Viral or phage segment sequenced. |
+| `serotype` | `Serotype` | Serological variety. |
+| `serovar` | `Serovar` | Serological variety (prokaryote). |
+| `sex` | `Sex` | Sex of the organism. |
+| `specimen_voucher` | `Specimen_voucher` | Specimen voucher identifier. |
+| `strain` | `Strain` | Strain of the organism. |
+| `sub_species` | `Sub_species` | Subspecies. |
+| `tissue_lib` | `Tissue_lib` | Tissue library. |
+| `tissue_type` | `Tissue_type` | Type of tissue. |
+| `variety` | `Variety` | Variety of the organism. |
+
+> **Note:** Columns not listed above are silently ignored and will not appear in the output metadata file.
 
 ### Output Format
 
@@ -128,7 +188,12 @@ The `prepare-ncbi-submission` command will take your input CSV and generate a fi
 ## FASTA Headers and Annotations
 
 FASTA headers are carefully managed during organization:
-* Sequences failing quality thresholds (e.g. length < 150nt, or N content ≥ 50%) are omitted from the FASTA and logged into `dropped_sequences.tsv`.
+* Sequences failing quality thresholds (e.g. length < 150nt, or N content ≥ 50%) are excluded from the FASTA. The reason for each exclusion is recorded in the `summary.txt` file inside the relevant output directory.
+* **Case-insensitive duplicate sequence IDs are automatically detected and removed.** NCBI treats sequence IDs as case-insensitive — for example, `SEQ001` and `seq001` are considered identical by NCBI and would cause an upload error. When a clash is detected, the **second** occurrence is dropped and the reason is logged in `summary.txt`:
+  ```
+  dropped: 1 sequence(s)
+    - seq001: Case-insensitive duplicate of 'SEQ001' (NCBI treats IDs as case-insensitive)
+  ```
 * Unsafe characters in sequence names (non-ASCII or pipes) are sanitized to underscores for NCBI compatibility, with translations logged in `renamed_headers.tsv`.
 * Spaces and brackets are preserved correctly, allowing standard NCBI feature qualifiers like `[Organism=...]` to work as intended for non-standard viruses.
 

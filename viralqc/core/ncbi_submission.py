@@ -201,14 +201,69 @@ def _write_fasta_single(
             fh.write(f">{clean_header}\n{rec.seq}\n")
 
 
+def deduplicate_case_insensitive(
+    records: list,
+    header_fn=None,
+    dropped_log: list | None = None,
+) -> list:
+    """
+    Remove records whose final FASTA header clashes case-insensitively with an
+    earlier record's header.
+
+    NCBI treats sequence IDs as case-insensitive, so ``SEQ1`` and ``seq1`` are
+    considered identical and cause an upload error. When a clash is detected the
+    *second* record (the one seen later) is dropped.  If *dropped_log* is
+    provided, a dict describing the dropped sequence is appended to it.
+
+    Args:
+        records: List of SeqRecord objects in write order.
+        header_fn: Same callable used in ``write_fasta`` to derive the header
+            string from a record. ``None`` means use ``record.id``.
+        dropped_log: Optional list to collect dropped-sequence descriptors
+            (dicts with keys ``seqName`` and ``reason``).
+
+    Returns:
+        Deduplicated list of SeqRecord objects (original objects, not copies).
+    """
+    seen: dict[str, str] = {}  # lowercase_id → original_id of first occurrence
+    kept: list = []
+    for rec in records:
+        raw_header = header_fn(rec) if header_fn else rec.id
+        # Apply sanitization so the key matches exactly what will be written
+        clean_header, _ = sanitize_seq_name(raw_header)
+        # Use only the part before the first space as the NCBI sequence ID
+        ncbi_id = clean_header.split()[0]
+        lower_id = ncbi_id.lower()
+        if lower_id in seen:
+            reason = (
+                f"Case-insensitive duplicate of '{seen[lower_id]}' "
+                f"(NCBI treats IDs as case-insensitive)"
+            )
+            logger.warning(
+                "Dropping '%s' — %s", ncbi_id, reason
+            )
+            if dropped_log is not None:
+                dropped_log.append({"seqName": rec.id, "reason": reason})
+        else:
+            seen[lower_id] = ncbi_id
+            kept.append(rec)
+    return kept
+
+
 def write_fasta(
     records: list,
     out_path: Path,
     header_fn=None,
     rename_log: list | None = None,
+    dropped_log: list | None = None,
 ) -> None:
     """
     Write SeqRecords to FASTA file(s), optionally applying a custom header.
+
+    Before writing, case-insensitive duplicate sequence IDs are detected and
+    removed (the second occurrence is dropped). NCBI treats IDs as
+    case-insensitive, so ``SEQ1`` and ``seq1`` would cause an upload error.
+    Dropped sequences are appended to *dropped_log* when provided.
 
     When the number of records exceeds :data:`NCBI_BATCH_SIZE` (3 000),
     the output is automatically split into numbered files
@@ -223,7 +278,15 @@ def write_fasta(
         header_fn: Optional callable (record) → str to compute the header.
             When None, the record.id is used.
         rename_log: Optional list to append rename events to.
+        dropped_log: Optional list to append case-insensitive duplicate
+            drop events to (dicts with ``seqName`` and ``reason`` keys).
     """
+    # Deduplicate case-insensitively before any writing
+    records = deduplicate_case_insensitive(records, header_fn=header_fn, dropped_log=dropped_log)
+
+    if not records:
+        return
+
     if len(records) <= NCBI_BATCH_SIZE:
         _write_fasta_single(records, out_path, header_fn, rename_log)
         return
@@ -370,6 +433,62 @@ _CUSTOM_OUTPUT_COLS = [
     "Isolation_source",
 ]
 
+# Optional NCBI source modifiers that may be present in the user's metadata CSV.
+# For standard viruses (Dengue, Influenza, Norovirus, SARS-CoV-2) the column names
+# follow the INSDC lower_snake naming used in the GenBank submission portal.
+_STANDARD_OPTIONAL_COLS: frozenset = frozenset(
+    [
+        "altitude",
+        "collected_by",
+        "culture_collection",
+        "genotype",
+        "haplotype",
+        "lab_host",
+        "lat_lon",
+        "note",
+        "segment",
+        "sex",
+        "specimen_voucher",
+        "strain",
+        "tissue_type",
+    ]
+)
+
+# For custom viruses the BankIt source-table uses Title_Case column names.
+# Keys are the input CSV column names (same as standard); values are the output names.
+_CUSTOM_OPTIONAL_RENAME_MAP: dict = {
+    "altitude": "Altitude",
+    "bio_material": "Bio_material",
+    "breed": "Breed",
+    "cell_line": "Cell_line",
+    "cell_type": "Cell_type",
+    "clone": "Clone",
+    "collected_by": "Collected_by",
+    "culture_collection": "Culture_collection",
+    "dev_stage": "Dev_stage",
+    "ecotype": "Ecotype",
+    "fwd_primer_name": "Fwd_primer_name",
+    "fwd_primer_seq": "Fwd_primer_seq",
+    "genotype": "Genotype",
+    "haplogroup": "Haplogroup",
+    "haplotype": "Haplotype",
+    "lab_host": "Lab_host",
+    "lat_lon": "Lat_Lon",
+    "note": "Note",
+    "rev_primer_name": "Rev_primer_name",
+    "rev_primer_seq": "Rev_primer_seq",
+    "segment": "Segment",
+    "serotype": "Serotype",
+    "serovar": "Serovar",
+    "sex": "Sex",
+    "specimen_voucher": "Specimen_voucher",
+    "strain": "Strain",
+    "sub_species": "Sub_species",
+    "tissue_lib": "Tissue_lib",
+    "tissue_type": "Tissue_type",
+    "variety": "Variety",
+}
+
 
 def load_metadata(path: "Path", is_standard: bool = True) -> "pd.DataFrame":
     """
@@ -457,12 +576,19 @@ def write_submission_metadata(
     """
     Build and write the NCBI submission metadata CSV alongside sequences.fasta.
 
-    For *standard* viruses (SARS-CoV-2, Dengue, Influenza) the output columns
-    are: ``Sequence_ID, geo_loc_name, host, isolate, collection-date,
-    isolation-source, serotype``.
+    For *standard* viruses (SARS-CoV-2, Dengue, Influenza, Norovirus) the
+    required output columns are: ``Sequence_ID, geo_loc_name, host, isolate,
+    collection-date, isolation-source, serotype``. Any column present in the
+    user-supplied metadata that is also listed in :data:`_STANDARD_OPTIONAL_COLS`
+    (e.g. ``lat_lon``, ``strain``, ``note``) is automatically appended.
 
-    For *custom* viruses the output columns are: ``Sequence_ID,
-    Country (geo_loc_name), Host, Isolate, Collection_date, Isolation_source``.
+    For *custom* viruses the required output columns (renamed to BankIt
+    Title_Case) are: ``Sequence_ID, Country (geo_loc_name), Host, Isolate,
+    Collection_date, Isolation_source``.  Optional columns listed in
+    :data:`_CUSTOM_OPTIONAL_RENAME_MAP` (e.g. ``lat_lon`` → ``Lat_Lon``,
+    ``strain`` → ``Strain``) are automatically detected and appended.
+
+    Unknown columns (not in either list) are silently ignored.
 
     Args:
         kept_records: SeqRecord list of sequences that passed filtering.
@@ -510,12 +636,30 @@ def write_submission_metadata(
         standard_base = base_cols if base_cols is not None else _STANDARD_OUTPUT_COLS
         extra_virus_cols = [c for c in extra.columns if c not in standard_base]
         out_cols = standard_base + extra_virus_cols
+
+        # Append any recognised optional modifiers the user supplied
+        optional_present = [
+            c
+            for c in meta.columns
+            if c in _STANDARD_OPTIONAL_COLS and c not in out_cols
+        ]
+        out_cols = out_cols + optional_present
+
     else:
-        meta.rename(columns=_CUSTOM_RENAME_MAP, inplace=True)
+        # Build the full rename map: required + optional
+        full_rename = {**_CUSTOM_RENAME_MAP, **_CUSTOM_OPTIONAL_RENAME_MAP}
+        meta.rename(columns=full_rename, inplace=True)
+
         if metadata_df is None:
             out_cols = ["Sequence_ID"]
         else:
-            out_cols = _CUSTOM_OUTPUT_COLS
+            # Required columns first, then any optional that exist in the df
+            optional_custom_present = [
+                renamed
+                for renamed in _CUSTOM_OPTIONAL_RENAME_MAP.values()
+                if renamed in meta.columns and renamed not in _CUSTOM_OUTPUT_COLS
+            ]
+            out_cols = _CUSTOM_OUTPUT_COLS + optional_custom_present
 
     for col in out_cols:
         if col not in meta.columns:
@@ -539,3 +683,4 @@ def write_submission_metadata(
                 batch_path,
                 len(batch),
             )
+

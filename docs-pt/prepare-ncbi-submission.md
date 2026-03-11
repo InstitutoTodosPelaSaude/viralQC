@@ -104,6 +104,8 @@ Para todos os comandos de submissão, você pode (ou deve, para vírus predefini
 
 O CSV de entrada pode conter as seguintes colunas. Sua necessidade depende do tipo de vírus sendo processado:
 
+#### Colunas Obrigatórias
+
 | Coluna | Descrição | Dengue, Influenza e Norovírus | SARS-CoV-2 | Vírus Personalizados |
 |--------|-----------|-------------------------------|------------|----------------------|
 | `Sequence_ID` | Deve corresponder exatamente ao `seqName` como aparece no arquivo de resultados e nos cabeçalhos FASTA. **Deve ter menos de 25 caracteres.** | **Obrigatório** | **Obrigatório** | **Obrigatório** |
@@ -114,6 +116,64 @@ O CSV de entrada pode conter as seguintes colunas. Sua necessidade depende do ti
 | `isolation-source` | O material de origem da amostra (ex: `Serum`, `Swab`). | **Obrigatório** | *Ignorado* | Opcional |
 
 *Nota: Para vírus personalizados, a criação do arquivo `--metadata` em si é completamente opcional. Se fornecido, apenas `Sequence_ID` deve estar presente, e as outras colunas de dados serão incluídas se você as adicionar.*
+
+#### Colunas Opcionais — Vírus Padrão (Dengue, Influenza, Norovírus, SARS-CoV-2)
+
+Qualquer um dos seguintes modificadores INSDC pode ser adicionado ao CSV de metadados. Se presente, será automaticamente incluído no `metadata.csv` de saída:
+
+| Coluna (cabeçalho CSV) | Descrição |
+|------------------------|----------|
+| `altitude` | Altitude em metros acima ou abaixo do nível do mar onde a amostra foi coletada. |
+| `collected_by` | Nome da pessoa que coletou a amostra. |
+| `culture_collection` | Código da instituição e ID da cultura (formato: `inst:col:id`). |
+| `haplotype` | Halotipo do organismo. |
+| `lab_host` | Hospedeiro laboratorial usado para propagar o organismo. |
+| `lat_lon` | Latitude e longitude em graus decimais (ex: `15.77 S 47.93 W`). |
+| `note` | Qualquer informação adicional em texto livre sobre a sequência. |
+| `segment` | Nome do segmento viral ou de fago sequenciado. |
+| `sex` | Sexo do organismo do qual a sequência foi obtida. |
+| `specimen_voucher` | Identificador institucional para o espécime fonte. |
+| `strain` | Cepa do organismo. |
+| `tissue_type` | Tipo de tecido do qual a sequência foi obtida. |
+
+#### Colunas Opcionais — Vírus Personalizados
+
+Para vírus personalizados, os metadados são um arquivo delimitado por tabulação e os nomes das colunas seguem a convenção Title_Case do BankIt. As seguintes colunas podem ser adicionadas ao CSV de entrada usando os nomes em minúsculas padrão — elas serão automaticamente renomeadas na saída:
+
+| Coluna de entrada | Coluna de saída | Descrição |
+|---|---|---|
+| `altitude` | `Altitude` | Altitude em metros. |
+| `bio_material` | `Bio_material` | Identificador de material biológico. |
+| `breed` | `Breed` | Raça nomeada (geralmente para mamíferos domesticados). |
+| `cell_line` | `Cell_line` | Linhagem celular da qual a sequência foi obtida. |
+| `cell_type` | `Cell_type` | Tipo de célula. |
+| `clone` | `Clone` | Clone do qual a sequência foi obtida. |
+| `collected_by` | `Collected_by` | Pessoa que coletou a amostra. |
+| `culture_collection` | `Culture_collection` | Identificador de coleção de cultura. |
+| `dev_stage` | `Dev_stage` | Estágio de desenvolvimento do organismo. |
+| `ecotype` | `Ecotype` | Ecotipo nomeado. |
+| `fwd_primer_name` | `Fwd_primer_name` | Nome do primer PCR direto. |
+| `fwd_primer_seq` | `Fwd_primer_seq` | Sequência do primer PCR direto. |
+| `genotype` | `Genotype` | Genótipo do organismo. |
+| `haplogroup` | `Haplogroup` | Haplogrupo do organismo. |
+| `haplotype` | `Haplotype` | Halotipo do organismo. |
+| `lab_host` | `Lab_host` | Hospedeiro laboratorial usado para propagar o organismo. |
+| `lat_lon` | `Lat_Lon` | Latitude e longitude em graus decimais. |
+| `note` | `Note` | Informação adicional em texto livre. |
+| `rev_primer_name` | `Rev_primer_name` | Nome do primer PCR reverso. |
+| `rev_primer_seq` | `Rev_primer_seq` | Sequência do primer PCR reverso. |
+| `segment` | `Segment` | Segmento viral ou de fago sequenciado. |
+| `serotype` | `Serotype` | Variedade sorológica. |
+| `serovar` | `Serovar` | Variedade sorológica (procarioto). |
+| `sex` | `Sex` | Sexo do organismo. |
+| `specimen_voucher` | `Specimen_voucher` | Identificador do espécime. |
+| `strain` | `Strain` | Cepa do organismo. |
+| `sub_species` | `Sub_species` | Subespécie. |
+| `tissue_lib` | `Tissue_lib` | Biblioteca de tecido. |
+| `tissue_type` | `Tissue_type` | Tipo de tecido. |
+| `variety` | `Variety` | Variedade do organismo. |
+
+> **Nota:** Colunas não listadas acima são ignoradas silenciosamente e não aparecerão no arquivo de metadados de saída.
 
 ### Formato de Saída
 
@@ -128,7 +188,12 @@ O comando `prepare-ncbi-submission` pegará seu CSV de entrada e gerará um arqu
 ## Cabeçalhos FASTA e Anotações
 
 Os cabeçalhos FASTA são gerenciados cuidadosamente durante a organização:
-* Sequências que não atingem os limites de qualidade (ex: comprimento < 150nt, ou conteúdo de N ≥ 50%) são omitidas do FASTA e registradas em `dropped_sequences.tsv`.
+* Sequências que não atingem os limites de qualidade (ex: comprimento < 150nt, ou conteúdo de N ≥ 50%) são excluídas do FASTA. O motivo de cada exclusão é registrado no arquivo `summary.txt` dentro do diretório de saída correspondente.
+* **IDs de sequências duplicados de forma case-insensitive são detectados e removidos automaticamente.** O NCBI trata IDs de sequências como case-insensitive — por exemplo, `SEQ001` e `seq001` são considerados idênticos pelo NCBI e causariam um erro no upload. Quando um conflito é detectado, a **segunda** ocorrência é descartada e o motivo é registrado no `summary.txt`:
+  ```
+  dropped: 1 sequence(s)
+    - seq001: Case-insensitive duplicate of 'SEQ001' (NCBI treats IDs as case-insensitive)
+  ```
 * Caracteres não seguros em nomes de sequências (não-ASCII ou pipes) são sanitizados para sublinhados para compatibilidade com o NCBI, com as traduções registradas em `renamed_headers.tsv`.
 * Espaços e colchetes são preservados corretamente, permitindo que qualificadores de recursos padrão do NCBI, como `[Organism=...]`, funcionem como pretendido para vírus não padronizados.
 
