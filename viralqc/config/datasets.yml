@@ -516,11 +516,9 @@ nextclade_data:
     target_gene: "E1"
     target_regions: ["C","E3","E2","6K","E1"]
     private_mutation_total_threshold: 30
-github:
   zikav:
-    repository: "dezordi/nextclade_data_workflows"
-    dataset: "zikaV/dataset"
-    tag: "development"
+    dataset: "community/itps/zikav"
+    tag: "2026-04-14--11-55-23Z"
     virus_name: "Zika virus"
     virus_tax_id: 64320
     virus_species: "Orthoflavivirus zikaense"
@@ -530,6 +528,7 @@ github:
     target_gene: "E"
     target_regions: ["C","prM","E"]
     private_mutation_total_threshold: 40
+github:
   orov-tefe-l:
     repository: "dezordi/nextclade_data_workflows"
     dataset: "orov/datasets/L/tefe"
