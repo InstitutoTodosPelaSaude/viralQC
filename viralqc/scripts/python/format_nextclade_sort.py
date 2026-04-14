@@ -25,7 +25,7 @@ def map_datasets_to_local_paths(
         remote_name = info.get("dataset")
         if remote_name:
             mapping[remote_name] = datasets_path / name
-    for name, info in config["github"].items():
+    for name, info in config.get("github", {}).items():
         mapping[name] = datasets_path / name
     return mapping
 
@@ -64,13 +64,11 @@ def format_nextclade_output(
     df = read_csv(
         tsv_file,
         sep="\t",
-        index_col=0,
         dtype={"seqName": str, "dataset": str, "score": "Float64", "numHits": "Int64"},
     )
     df_external = read_csv(
         tsv_external_file,
         sep="\t",
-        index_col=0,
         dtype={"seqName": str, "dataset": str, "score": "Float64", "numHits": "Int64"},
     )
     df = concat([df, df_external], ignore_index=True)
@@ -101,7 +99,10 @@ def write_unmapped_sequences(formatted_df: DataFrame, output_dir: Path) -> None:
     unmapped_file = output_dir / "unmapped_sequences.txt"
 
     unmapped_seqs = formatted_df.loc[
-        formatted_df["localDataset"].isna(), "seqName"
+        formatted_df["localDataset"].isna()
+        | (formatted_df["localDataset"].astype(str).str.strip() == "")
+        | (formatted_df["localDataset"].astype(str).str.lower() == "nan"),
+        "seqName",
     ].drop_duplicates()
     if not unmapped_seqs.empty:
         unmapped_seqs.to_csv(unmapped_file, index=False, header=False)

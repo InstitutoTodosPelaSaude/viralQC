@@ -150,14 +150,6 @@ output/
 └── sequences_target_regions.fasta    # FASTA file with extracted target region sequences
 ```
 
-## Usage (API)
-
-```bash
-vqc-server
-```
-
-Go to `http://127.0.0.1:8000/docs`
-
 ### Development
 
 Install development dependencies and run `black` into `viralqc` directory.

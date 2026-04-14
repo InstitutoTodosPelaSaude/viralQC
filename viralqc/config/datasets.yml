@@ -1,7 +1,7 @@
 nextclade_data:
   denv1:
     dataset: "community/v-gen-lab/dengue/denv1"
-    tag: "2025-04-02--19-11-08Z"
+    tag: "2025-09-09--12-13-13Z"
     virus_name: "Dengue virus type 1"
     virus_tax_id: 11053
     virus_species: "Orthoflavivirus denguei"
@@ -13,7 +13,7 @@ nextclade_data:
     private_mutation_total_threshold: 70
   denv2:
     dataset: "community/v-gen-lab/dengue/denv2"
-    tag: "2025-03-26--11-47-13Z"
+    tag: "2025-09-09--12-13-13Z"
     virus_name: "Dengue virus type 2"
     virus_tax_id: 11060
     virus_species: "Orthoflavivirus denguei"
@@ -25,7 +25,7 @@ nextclade_data:
     private_mutation_total_threshold: 105
   denv3:
     dataset: "community/v-gen-lab/dengue/denv3"
-    tag: "2025-03-26--11-47-13Z"
+    tag: "2025-09-09--12-13-13Z"
     virus_name: "Dengue virus type 3"
     virus_tax_id: 11069
     virus_species: "Orthoflavivirus denguei"
@@ -37,7 +37,7 @@ nextclade_data:
     private_mutation_total_threshold: 65
   denv4:
     dataset: "community/v-gen-lab/dengue/denv4"
-    tag: "2025-03-26--11-47-13Z"
+    tag: "2025-09-09--12-13-13Z"
     virus_name: "Dengue virus type 4"
     virus_tax_id: 11070
     virus_species: "Orthoflavivirus denguei"
@@ -49,7 +49,7 @@ nextclade_data:
     private_mutation_total_threshold: 75
   sarscov2-wuhan:
     dataset: "nextstrain/sars-cov-2/wuhan-hu-1/orfs"
-    tag: "2025-06-09--15-42-38Z"
+    tag: "2026-01-06--14-59-32Z"
     virus_name: "SARS-CoV-2"
     virus_tax_id: 2697049
     virus_species: "Betacoronavirus pandemicum"
@@ -58,9 +58,10 @@ nextclade_data:
     ncbi_id: "MN908947.3"
     target_gene: "S"
     target_regions: ["ORF1a", "ORF1b", "S"]
+    private_mutation_total_threshold: 19
   sarscov2-ba:
     dataset: "nextstrain/sars-cov-2/BA.2.86"
-    tag: "2025-06-09--15-42-38Z"
+    tag: "2026-01-06--14-59-32Z"
     virus_name: "SARS-CoV-2"
     virus_tax_id: 2697049
     virus_species: "Betacoronavirus pandemicum"
@@ -69,9 +70,10 @@ nextclade_data:
     ncbi_id: "MN908947.3"
     target_gene: "S"
     target_regions: ["ORF1a", "ORF1b", "S"]
+    private_mutation_total_threshold: 19
   rsva:
     dataset: "nextstrain/rsv/a/EPI_ISL_412866"
-    tag: "2024-11-27--02-51-00Z"
+    tag: "2025-09-09--12-13-13Z"
     virus_name: "Respiratory syncytial virus A"
     virus_tax_id: 208893
     virus_species: "Orthopneumovirus hominis"
@@ -83,7 +85,7 @@ nextclade_data:
     private_mutation_total_threshold: 80
   rsvb:
     dataset: "nextstrain/rsv/b/EPI_ISL_1653999"
-    tag: "2025-03-04--17-31-25Z"
+    tag: "2025-09-09--12-13-13Z"
     virus_name: "Respiratory syncytial virus B"
     virus_tax_id: 208895
     virus_species: "Orthopneumovirus hominis"
@@ -95,7 +97,7 @@ nextclade_data:
     private_mutation_total_threshold: 50
   flu-h1n1-ha-CY121680:
     dataset: "nextstrain/flu/h1n1pdm/ha/CY121680"
-    tag: "2025-09-09--12-13-13Z"
+    tag: "2025-12-02--12-30-02Z"
     virus_name: "Influenza A H1N1"
     virus_tax_id: 11320
     virus_species: "Alphainfluenzavirus influenzae"
@@ -107,7 +109,7 @@ nextclade_data:
     private_mutation_total_threshold: 10
   flu-h1n1-ha-MW626062:
     dataset: "nextstrain/flu/h1n1pdm/ha/MW626062"
-    tag: "2025-09-09--12-13-13Z"
+    tag: "2025-12-02--12-30-02Z"
     virus_name: "Influenza A H1N1"
     virus_tax_id: 11320
     virus_species: "Alphainfluenzavirus influenzae"
@@ -197,7 +199,7 @@ nextclade_data:
     target_regions: ["PB2"]
   flu-h3n2-ha-CY163680:
     dataset: "nextstrain/flu/h3n2/ha/CY163680"
-    tag: "2025-09-09--12-13-13Z"
+    tag: "2025-11-04--15-46-13Z"
     virus_name: "Influenza A H3N2"
     virus_tax_id: 11320
     virus_species: "Alphainfluenzavirus influenzae"
@@ -209,7 +211,7 @@ nextclade_data:
     private_mutation_total_threshold: 10
   flu-h3n2-ha-EPI1857216:
     dataset: "nextstrain/flu/h3n2/ha/EPI1857216"
-    tag: "2025-09-09--12-13-13Z"
+    tag: "2025-11-04--15-46-13Z"
     virus_name: "Influenza A H3N2"
     virus_tax_id: 11320
     virus_species: "Alphainfluenzavirus influenzae"
@@ -299,7 +301,7 @@ nextclade_data:
     target_regions: ["PB2"]
   flu-vic-ha:
     dataset: "nextstrain/flu/vic/ha/KX058884"
-    tag: "2025-09-09--12-13-13Z"
+    tag: "2025-10-22--18-11-36Z"
     virus_name: "Influenza B"
     virus_tax_id: 11520
     virus_species: "Betainfluenzavirus influenzae"
@@ -411,6 +413,97 @@ nextclade_data:
     ncbi_id: "CY115158.1"
     target_gene: "PB2"
     target_regions: ["PB2"]
+  flu-b-ha:
+    dataset: "nextstrain/flu/b/ha/KX058884"
+    tag: "2026-01-14--08-53-00Z"
+    virus_name: "Influenza B"
+    virus_tax_id: 11520
+    virus_species: "Betainfluenzavirus influenzae"
+    virus_species_tax_id: 2955465
+    segment: "HA"
+    ncbi_id: "KX058884.1"
+    target_gene: "HA1"
+    target_regions: ["HA1", "SigPep"]
+    private_mutation_total_threshold: 10
+  flu-b-na:
+    dataset: "nextstrain/flu/b/na/CY073894"
+    tag: "2026-01-14--08-53-00Z"
+    virus_name: "Influenza B"
+    virus_tax_id: 11520
+    virus_species: "Betainfluenzavirus influenzae"
+    virus_species_tax_id: 2955465
+    segment: "NA"
+    ncbi_id: "CY073894.1"
+    target_gene: "NA"
+    target_regions: ["NA"]
+    private_mutation_total_threshold: 10
+  flu-b-mp:
+    dataset: "nextstrain/flu/b/mp"
+    tag: "2026-01-14--08-53-00Z"
+    virus_name: "Influenza B"
+    virus_tax_id: 11520
+    virus_species: "Betainfluenzavirus influenzae"
+    virus_species_tax_id: 2955465
+    segment: "MP"
+    ncbi_id: "CY115152.1"
+    target_gene: "M1"
+    target_regions: ["M1", "BM2"]
+    private_mutation_total_threshold: 10
+  flu-b-np:
+    dataset: "nextstrain/flu/b/np"
+    tag: "2026-01-14--08-53-00Z"
+    virus_name: "Influenza B"
+    virus_tax_id: 11520
+    virus_species: "Betainfluenzavirus influenzae"
+    virus_species_tax_id: 2955465
+    segment: "NP"
+    ncbi_id: "CY115154.1"
+    target_gene: "NP"
+    target_regions: ["NP"]
+  flu-b-ns:
+    dataset: "nextstrain/flu/b/ns"
+    tag: "2026-01-14--08-53-00Z"
+    virus_name: "Influenza B"
+    virus_tax_id: 11520
+    virus_species: "Betainfluenzavirus influenzae"
+    virus_species_tax_id: 2955465
+    segment: "NS"
+    ncbi_id: "CY115155.1"
+    target_gene: "NS1"
+    target_regions: ["NEP", "NS1"]
+  flu-b-pa:
+    dataset: "nextstrain/flu/b/pa"
+    tag: "2026-01-14--08-53-00Z"
+    virus_name: "Influenza B"
+    virus_tax_id: 11520
+    virus_species: "Betainfluenzavirus influenzae"
+    virus_species_tax_id: 2955465
+    segment: "PA"
+    ncbi_id: "CY115156.1"
+    target_gene: "PA"
+    target_regions: ["PA"]
+  flu-b-pb1:
+    dataset: "nextstrain/flu/b/pb1"
+    tag: "2026-01-14--08-53-00Z"
+    virus_name: "Influenza B"
+    virus_tax_id: 11520
+    virus_species: "Betainfluenzavirus influenzae"
+    virus_species_tax_id: 2955465
+    segment: "PB1"
+    ncbi_id: "CY115157.1"
+    target_gene: "PB1"
+    target_regions: ["PB1"]
+  flu-b-pb2:
+    dataset: "nextstrain/flu/b/pb2"
+    tag: "2026-01-14--08-53-00Z"
+    virus_name: "Influenza B"
+    virus_tax_id: 11520
+    virus_species: "Betainfluenzavirus influenzae"
+    virus_species_tax_id: 2955465
+    segment: "PB2"
+    ncbi_id: "CY115158.1"
+    target_gene: "PB2"
+    target_regions: ["PB2"]
   chikv:
     dataset: "community/v-gen-lab/chikV/genotypes"
     tag: "2025-09-24--07-29-03Z"
@@ -423,11 +516,9 @@ nextclade_data:
     target_gene: "E1"
     target_regions: ["C","E3","E2","6K","E1"]
     private_mutation_total_threshold: 30
-github:
   zikav:
-    repository: "dezordi/nextclade_data_workflows"
-    dataset: "zikaV/dataset"
-    tag: "development"
+    dataset: "community/itps/zikav"
+    tag: "2026-04-14--11-55-23Z"
     virus_name: "Zika virus"
     virus_tax_id: 64320
     virus_species: "Orthoflavivirus zikaense"
@@ -437,6 +528,7 @@ github:
     target_gene: "E"
     target_regions: ["C","prM","E"]
     private_mutation_total_threshold: 40
+github:
   orov-tefe-l:
     repository: "dezordi/nextclade_data_workflows"
     dataset: "orov/datasets/L/tefe"

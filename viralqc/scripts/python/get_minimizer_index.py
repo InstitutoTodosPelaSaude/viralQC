@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 ## This a short version of minimizer.py from nextclade project (https://github.com/nextstrain/nextclade_data/blob/master/scripts/minimizer)
 ## The import paths have been adjusted to work within viralqc project structure.
 ## The fasta_read was modified to include dataset information in the SeqRecord annotations to

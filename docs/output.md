@@ -20,7 +20,14 @@ outputs/             # User specified output directory (e.g., --output-dir my_re
     │   └── <accession>.generic.nextclade.tsv
     ├── gff_files/
     │   ├── <virus>.nextclade.gff
-    │   └── <accession>.generic.nextclade.gff
+    │   ├── <accession>.generic.nextclade.gff
+    │   └── per_sample/
+    │       └── <id>_<sample_name>.gff
+    ├── tbl_files/
+    │   ├── <virus>.nextclade.tbl
+    │   ├── <accession>.generic.nextclade.tbl
+    │   └── per_sample/
+    │       └── <id>_<sample_name>.tbl
     ├── logs/
     │   ├── nextclade_sort.log
     │   ├── blast.log
@@ -156,3 +163,45 @@ seq2    0       10735   genome
 ### sequences_target_regions.fasta
 
 Extracted sequences from regions meeting quality criteria.
+
+## Annotation Files
+
+### gff_files/
+
+Contains GFF3 annotation files produced by Nextclade for each virus dataset.
+Each file covers all samples analyzed for that virus (identified by numeric IDs).
+
+| File | Description |
+|------|-------------|
+| `<virus>.nextclade.gff` | Multi-sample GFF from the standard Nextclade run |
+| `<accession>.generic.nextclade.gff` | Multi-sample GFF from the BLAST-based generic Nextclade run |
+
+#### gff_files/per_sample/
+
+One GFF file per sample, automatically split from the combined output above.
+The numeric sequence ID used internally by viralQC is replaced with the
+original sample header throughout the file (sequence region directive, column 1,
+and feature attributes).
+
+- **Filename format:** `{id}_{sample_name}.gff`
+
+### tbl_files/
+
+Contains 5-column feature table (TBL) annotation files produced by Nextclade
+for each virus dataset. The TBL format is compatible with NCBI submission tools.
+
+| File | Description |
+|------|-------------|
+| `<virus>.nextclade.tbl` | Multi-sample TBL from the standard Nextclade run |
+| `<accession>.generic.nextclade.tbl` | Multi-sample TBL from the BLAST-based generic Nextclade run |
+
+#### tbl_files/per_sample/
+
+One TBL file per sample, automatically split from the combined output above.
+The `>Feature <id>` header in each block is replaced with the original sample
+name.
+
+- **Filename format:** `{id}_{sample_name}.tbl`
+
+> **Note:** Files in `per_sample/` are empty (zero-byte) for samples where
+> Nextclade was executed without a reference GFF file.

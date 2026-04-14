@@ -1,6 +1,6 @@
 [project]
 name = "viralQC"
-version = "0.13.1"
+version = "1.0.0"
 description = "A tool and package for quality control of consensus virus genomes."
 authors = [
     { name = "Filipe Zimmer Dezordi", email = "zimmer.filipe@gmail.com" }
@@ -50,3 +50,7 @@ viralqc = ["config/datasets.yml"]
 
 [project.urls]
 Homepage = "https://github.com/InstitutoTodosPelaSaude/viralQC"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"

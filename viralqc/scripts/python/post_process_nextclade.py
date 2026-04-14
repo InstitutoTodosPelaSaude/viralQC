@@ -1,4 +1,5 @@
 import argparse, re, csv, os, gc
+from pathlib import Path as _Path
 from itertools import chain
 from pathlib import Path
 from typing import Generator, Iterator
@@ -6,6 +7,19 @@ from pandas import read_csv, concat, DataFrame, notna, Series, NA, to_numeric
 from numpy import nan
 from pandas.errors import EmptyDataError
 from yaml import safe_load
+
+
+def sanitize_name(name: str) -> str:
+    """
+    Replace characters that are unsafe in file names with underscores.
+
+    Args:
+        name: Original sample header string.
+
+    Returns:
+        String with special characters replaced by '_'.
+    """
+    return re.sub(r"[^A-Za-z0-9_.\-]", "_", name)
 
 
 TARGET_COLUMNS = {
@@ -75,6 +89,8 @@ TARGET_COLUMNS = {
     "qc.stopCodons.totalStopCodons": "Int64",
     "qc.stopCodons.score": "float64",
     "qc.stopCodons.status": str,
+    "gff_path": str,
+    "tbl_path": str,
     "dataset": str,
     "datasetVersion": str,
 }
@@ -127,6 +143,23 @@ def load_blast_metadata(metadata_path: Path) -> DataFrame:
         return df
     except Exception:
         return DataFrame(columns=list(column_mapping.values()))
+
+
+def load_id_mapping(mapping_path: Path) -> dict:
+    """
+    Load the ID mapping TSV file.
+
+    Args:
+        mapping_path: Path to the mapping file.
+
+    Returns:
+        Dictionary mapping sanitized ID to original header.
+    """
+    try:
+        df = read_csv(mapping_path, sep="\t", dtype=str)
+        return dict(zip(df["id"], df["original_header"]))
+    except Exception:
+        return {}
 
 
 def format_sc2_clade(df: DataFrame, dataset_name: str) -> DataFrame:
@@ -762,9 +795,9 @@ def format_dfs(
 
         if not df.empty:
             virus_dataset = _extract_dataset_name(file)
-            virus_info = config["nextclade_data"].get(
-                virus_dataset, config["github"].get(virus_dataset)
-            )
+            virus_info = config["nextclade_data"].get(virus_dataset)
+            if virus_info is None and "github" in config:
+                virus_info = config["github"].get(virus_dataset)
 
             if virus_info:
                 _process_with_virus_info(df, virus_dataset, virus_info)
@@ -912,6 +945,25 @@ def _sanitize_dataframe(df: DataFrame) -> DataFrame:
     return final_df
 
 
+def _map_ids(df: DataFrame, id_map: dict) -> DataFrame:
+    """
+    Restore original IDs using the mapping dictionary.
+    Modifies DataFrame in-place.
+
+    Args:
+        df: DataFrame to process.
+        id_map: Dictionary mapping sanitized ID to original header.
+
+    Returns:
+        DataFrame with restored IDs.
+    """
+    if id_map and "seqName" in df.columns:
+        # Convert seqName to string to ensure matching works
+        df["seqName"] = df["seqName"].astype(str)
+        df["seqName"] = df["seqName"].map(id_map).fillna(df["seqName"])
+    return df
+
+
 def _filter_unmapped_sequences(
     unmapped_df: DataFrame, processed_seq_names: set
 ) -> DataFrame:
@@ -930,6 +982,53 @@ def _filter_unmapped_sequences(
             ~unmapped_df["seqName"].astype(str).isin(processed_seq_names)
         ]
     return unmapped_df
+
+
+def add_annotation_paths(
+    df: DataFrame,
+    reverse_id_map: dict,
+    gff_per_sample_dir: Path | None,
+    tbl_per_sample_dir: Path | None,
+) -> None:
+    """
+    Add gff_path and tbl_path columns to a dataframe (in-place).
+
+    Paths are constructed as ``<dir>/{id}_{sanitized_seqName}.{ext}`` and
+    set to an empty string when the corresponding file does not exist or
+    when no annotation directory was provided.
+
+    Args:
+        df: DataFrame whose seqName column already holds original sample
+            headers (i.e. after _map_ids has been called).
+        reverse_id_map: Dictionary mapping original_header to numeric id.
+        gff_per_sample_dir: Path to the gff_files/per_sample/ directory.
+        tbl_per_sample_dir: Path to the tbl_files/per_sample/ directory.
+    """
+
+    def _build_path(seq_name: str, directory: Path | None, ext: str) -> str:
+        if directory is None or not isinstance(seq_name, str):
+            return ""
+        sample_id = reverse_id_map.get(seq_name, "")
+        if not sample_id:
+            return ""
+        candidate = directory / f"{sample_id}_{sanitize_name(seq_name)}.{ext}"
+        return str(candidate) if candidate.exists() else ""
+
+    if "seqName" not in df.columns:
+        df["gff_path"] = ""
+        df["tbl_path"] = ""
+        return
+
+    df["gff_path"] = (
+        df["seqName"]
+        .astype(str)
+        .apply(lambda s: _build_path(s, gff_per_sample_dir, "gff"))
+    )
+    df["tbl_path"] = (
+        df["seqName"]
+        .astype(str)
+        .apply(lambda s: _build_path(s, tbl_per_sample_dir, "tbl"))
+    )
 
 
 def _format_json_columns(df: DataFrame) -> None:
@@ -996,6 +1095,10 @@ def _write_json_output(
     unmapped_df: DataFrame,
     processed_seq_names: set,
     output_file: Path,
+    id_map: dict = None,
+    reverse_id_map: dict = None,
+    gff_per_sample_dir: Path | None = None,
+    tbl_per_sample_dir: Path | None = None,
 ) -> None:
     """
     Write all dataframes to JSON output file.
@@ -1005,10 +1108,19 @@ def _write_json_output(
         unmapped_df: Optional unmapped sequences dataframe.
         processed_seq_names: Set of already processed sequence names.
         output_file: Path to output file.
+        id_map: Dictionary for ID mapping (numeric id -> original header).
+        reverse_id_map: Dictionary mapping original header to numeric id.
+        gff_per_sample_dir: Path to the gff_files/per_sample/ directory.
+        tbl_per_sample_dir: Path to the tbl_files/per_sample/ directory.
     """
     all_data = []
 
     for df in df_iterator:
+        if id_map:
+            df = _map_ids(df, id_map)
+        add_annotation_paths(
+            df, reverse_id_map or {}, gff_per_sample_dir, tbl_per_sample_dir
+        )
         final_df = _sanitize_dataframe(df)
         all_data.append(final_df)
         del df, final_df
@@ -1017,6 +1129,14 @@ def _write_json_output(
     if unmapped_df is not None and not unmapped_df.empty:
         unmapped_df = _filter_unmapped_sequences(unmapped_df, processed_seq_names)
         if not unmapped_df.empty:
+            if id_map:
+                unmapped_df = _map_ids(unmapped_df, id_map)
+            add_annotation_paths(
+                unmapped_df,
+                reverse_id_map or {},
+                gff_per_sample_dir,
+                tbl_per_sample_dir,
+            )
             final_unmapped = _sanitize_dataframe(unmapped_df)
             all_data.append(final_unmapped)
 
@@ -1080,6 +1200,10 @@ def _write_csv_tsv_output(
     processed_seq_names: set,
     output_file: Path,
     output_format: str,
+    id_map: dict = None,
+    reverse_id_map: dict = None,
+    gff_per_sample_dir: Path | None = None,
+    tbl_per_sample_dir: Path | None = None,
 ) -> None:
     """
     Write all dataframes to CSV/TSV output file incrementally.
@@ -1090,10 +1214,19 @@ def _write_csv_tsv_output(
         processed_seq_names: Set of already processed sequence names.
         output_file: Path to output file.
         output_format: 'csv' or 'tsv'.
+        id_map: Dictionary for ID mapping (numeric id -> original header).
+        reverse_id_map: Dictionary mapping original header to numeric id.
+        gff_per_sample_dir: Path to the gff_files/per_sample/ directory.
+        tbl_per_sample_dir: Path to the tbl_files/per_sample/ directory.
     """
     first_chunk = True
 
     for df in df_iterator:
+        if id_map:
+            df = _map_ids(df, id_map)
+        add_annotation_paths(
+            df, reverse_id_map or {}, gff_per_sample_dir, tbl_per_sample_dir
+        )
         final_df = _sanitize_dataframe(df)
         _write_csv_tsv_chunk(
             final_df, output_file, output_format, first_chunk, first_chunk
@@ -1105,6 +1238,14 @@ def _write_csv_tsv_output(
     if unmapped_df is not None and not unmapped_df.empty:
         unmapped_df = _filter_unmapped_sequences(unmapped_df, processed_seq_names)
         if not unmapped_df.empty:
+            if id_map:
+                unmapped_df = _map_ids(unmapped_df, id_map)
+            add_annotation_paths(
+                unmapped_df,
+                reverse_id_map or {},
+                gff_per_sample_dir,
+                tbl_per_sample_dir,
+            )
             final_unmapped = _sanitize_dataframe(unmapped_df)
             _write_csv_tsv_chunk(
                 final_unmapped, output_file, output_format, False, False
@@ -1119,6 +1260,10 @@ def write_combined_df(
     output_format: str,
     unmapped_df: DataFrame = None,
     processed_seq_names: set = None,
+    id_map: dict = None,
+    reverse_id_map: dict = None,
+    gff_per_sample_dir: Path | None = None,
+    tbl_per_sample_dir: Path | None = None,
 ) -> None:
     """
     Write dataframes incrementally to reduce memory usage.
@@ -1129,12 +1274,33 @@ def write_combined_df(
         output_format: Format to write output (csv, tsv, or json).
         unmapped_df: Optional unmapped sequences dataframe.
         processed_seq_names: Set of sequence names already processed.
+        id_map: Dictionary for ID mapping (numeric id -> original header).
+        reverse_id_map: Dictionary mapping original header to numeric id.
+        gff_per_sample_dir: Path to the gff_files/per_sample/ directory.
+        tbl_per_sample_dir: Path to the tbl_files/per_sample/ directory.
     """
     if output_format == "json":
-        _write_json_output(df_iterator, unmapped_df, processed_seq_names, output_file)
+        _write_json_output(
+            df_iterator,
+            unmapped_df,
+            processed_seq_names,
+            output_file,
+            id_map,
+            reverse_id_map,
+            gff_per_sample_dir,
+            tbl_per_sample_dir,
+        )
     else:
         _write_csv_tsv_output(
-            df_iterator, unmapped_df, processed_seq_names, output_file, output_format
+            df_iterator,
+            unmapped_df,
+            processed_seq_names,
+            output_file,
+            output_format,
+            id_map,
+            reverse_id_map,
+            gff_per_sample_dir,
+            tbl_per_sample_dir,
         )
 
 
@@ -1175,6 +1341,12 @@ if __name__ == "__main__":
         help="Path to blast database metadata tsv file.",
     ),
     parser.add_argument(
+        "--id-mapping",
+        type=Path,
+        required=False,
+        help="Path to the ID mapping TSV file.",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         required=True,
@@ -1187,6 +1359,13 @@ if __name__ == "__main__":
         default="tsv",
         help="Output file format.",
     )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=False,
+        default=None,
+        help="ViralQC output directory (used to locate per-sample GFF and TBL files).",
+    )
     args = parser.parse_args()
 
     # Load dataframes
@@ -1198,6 +1377,17 @@ if __name__ == "__main__":
     unmapped_df = create_unmapped_df(
         args.unmapped_sequences, args.blast_results, blast_metadata_df
     )
+
+    id_map = load_id_mapping(args.id_mapping) if args.id_mapping else {}
+    reverse_id_map = {v: k for k, v in id_map.items()}
+
+    # Resolve per-sample annotation directories
+    gff_per_sample_dir = None
+    tbl_per_sample_dir = None
+    if args.output_dir:
+        output_dir_abs = args.output_dir.resolve()
+        gff_per_sample_dir = output_dir_abs / "gff_files" / "per_sample"
+        tbl_per_sample_dir = output_dir_abs / "tbl_files" / "per_sample"
 
     # Organize sequences and results from Nextclade
     processed_seq_names = set()
@@ -1215,4 +1405,8 @@ if __name__ == "__main__":
         args.output_format,
         unmapped_df=unmapped_df,
         processed_seq_names=processed_seq_names,
+        id_map=id_map,
+        reverse_id_map=reverse_id_map,
+        gff_per_sample_dir=gff_per_sample_dir,
+        tbl_per_sample_dir=tbl_per_sample_dir,
     )

@@ -9,7 +9,6 @@ build/
 
 # Snakemake and test outputs
 .snakemake/
-tests/
-estudo_ref/
+ncbi_submission_*
 datasets/
 __pycache__/

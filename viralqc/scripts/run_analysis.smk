@@ -44,6 +44,22 @@ rule parameters:
 parameters = rules.parameters.params
 
 
+rule itemize_sequences:
+    message:
+        "Renaming sequences to sequential IDs"
+    input:
+        sequences = parameters.sequences_fasta
+    output:
+        fasta = f"{parameters.output_dir}/sequences_sanitized.fasta",
+        mapping = f"{parameters.output_dir}/identified_datasets/id_mapping.tsv"
+    shell:
+        """
+        python {PKG_PATH}/scripts/python/itemize_sequences.py \
+            --input {input.sequences} \
+            --output-fasta {output.fasta} \
+            --output-mapping {output.mapping}
+        """
+
 _run_counters = {}
 def get_nextclade_outputs(wildcards):
     output_dir = parameters.output_dir
@@ -85,12 +101,12 @@ rule nextclade_sort:
     message:
         "Run nextclade sort to identify datasets"
     input:
-        sequences = parameters.sequences_fasta,
-        external_datasets_minimizers = parameters.external_datasets_minimizers
+        sequences = rules.itemize_sequences.output.fasta
     params:
         output_dir = parameters.output_dir,
         min_score = parameters.nextclade_sort_min_score,
-        min_hits = parameters.nextclade_sort_min_hits
+        min_hits = parameters.nextclade_sort_min_hits,
+        external_datasets_minimizers = parameters.external_datasets_minimizers
     output:
         viruses_identified =  f"{parameters.output_dir}/identified_datasets/viruses.tsv",
         viruses_identified_external =  f"{parameters.output_dir}/identified_datasets/viruses.external_datasets.tsv"
@@ -113,24 +129,28 @@ rule nextclade_sort:
             --jobs {threads} 2>>{log}
 
         # Run nextclade sort again using only sequences that were not mapped in the datasets from nextclade_data
+        # This only runs if external_datasets_minimizers.json exists (i.e., github datasets are configured)
         awk -F"\\t" '{{if ($3 == "") print $2}}' \
             {output.viruses_identified} > \
-            {params.output_dir}/identified_datasets/tmp_unmapped_sequences.txt 2>>{log} 
+            {params.output_dir}/identified_datasets/tmp_unmapped_sequences.txt 2>>{log}
 
-        if [ -s {params.output_dir}/identified_datasets/tmp_unmapped_sequences.txt ]; then
+        if [ -f "{params.external_datasets_minimizers}" ] && [ -s {params.output_dir}/identified_datasets/tmp_unmapped_sequences.txt ]; then
             seqtk subseq {input.sequences} {params.output_dir}/identified_datasets/tmp_unmapped_sequences.txt > \
                 {params.output_dir}/identified_datasets/tmp_unmapped_sequences.fasta 2>>{log}
-        fi
 
-        if [ -s {params.output_dir}/identified_datasets/tmp_unmapped_sequences.fasta ]; then
-            nextclade sort {params.output_dir}/identified_datasets/tmp_unmapped_sequences.fasta \
-                --input-minimizer-index-json {input.external_datasets_minimizers} \
-                --output-path '{params.output_dir}/identified_datasets/{{name}}/sequences.fa' \
-                --output-results-tsv {output.viruses_identified_external} \
-                --min-score {params.min_score} \
-                --min-hits {params.min_hits} \
-                --jobs {threads} 2>>{log}
+            if [ -s {params.output_dir}/identified_datasets/tmp_unmapped_sequences.fasta ]; then
+                nextclade sort {params.output_dir}/identified_datasets/tmp_unmapped_sequences.fasta \
+                    --input-minimizer-index-json {params.external_datasets_minimizers} \
+                    --output-path '{params.output_dir}/identified_datasets/{{name}}/sequences.fa' \
+                    --output-results-tsv {output.viruses_identified_external} \
+                    --min-score {params.min_score} \
+                    --min-hits {params.min_hits} \
+                    --jobs {threads} 2>>{log}
+            else
+                echo -e "seqName\tdataset\tscore\tnumHits" > {output.viruses_identified_external} 2>>{log}
+            fi
         else
+            # No external datasets configured or no unmapped sequences
             echo -e "seqName\tdataset\tscore\tnumHits" > {output.viruses_identified_external} 2>>{log}
         fi
 
@@ -152,14 +172,18 @@ checkpoint select_datasets_from_nextclade:
         unmapped_sequences = f"{parameters.output_dir}/identified_datasets/unmapped_sequences.txt"
     threads:
         parameters.threads
+    log:
+        f"{parameters.output_dir}/logs/format_nextclade_sort.log"
     shell:
         """
+        set -euo pipefail
+
         python {PKG_PATH}/scripts/python/format_nextclade_sort.py \
             --nextclade-output {input.viruses_identified} \
             --nextclade-external-output {input.viruses_identified_external} \
             --config-file {input.config_file} \
             --local-datasets-path {params.datasets_local_path}/ \
-            --output-path {params.output_dir}/identified_datasets 
+            --output-path {params.output_dir}/identified_datasets 2>>{log}
         """
 
 
@@ -167,7 +191,7 @@ rule blast:
     message:
         "Run BLAST for unmapped sequences"
     input:
-        sequences = parameters.sequences_fasta,
+        sequences = rules.itemize_sequences.output.fasta,
         unmapped_sequences = rules.select_datasets_from_nextclade.output.unmapped_sequences,
         blast_database = parameters.blast_database
     params:
@@ -184,22 +208,26 @@ rule blast:
         f"{parameters.output_dir}/logs/blast.log"
     shell:
         """
-        mkdir -p {params.output_dir}/blast_results
+        set -euo pipefail
+
+        mkdir -p {params.output_dir}/blast_results 2>>{log}
         if [ -s {input.unmapped_sequences} ]; then
-            seqtk subseq {input.sequences} {input.unmapped_sequences} > {params.output_dir}/blast_results/unmapped_sequences.fasta
+            seqtk subseq {input.sequences} {input.unmapped_sequences} > {params.output_dir}/blast_results/unmapped_sequences.fasta 2>>{log}
 
-            python {PKG_PATH}/scripts/python/blast_wrapper.py \
-                --input {params.output_dir}/blast_results/unmapped_sequences.fasta \
-                --db {input.blast_database} \
-                --output {output.viruses_identified} \
-                --task {params.blast_task} \
-                --evalue {params.blast_evalue} \
-                --qcov {params.blast_qcov} \
-                --perc_identity {params.identity_threshold} \
-                --threads {threads} \
-                --outfmt "6 qseqid qlen sseqid slen qstart qend sstart send evalue bitscore pident qcovs qcovhsp" 2> {log}
+            blastn \
+                -query {params.output_dir}/blast_results/unmapped_sequences.fasta \
+                -db {input.blast_database} \
+                -out {output.viruses_identified} \
+                -task {params.blast_task} \
+                -evalue {params.blast_evalue} \
+                -qcov_hsp_perc {params.blast_qcov} \
+                -perc_identity {params.identity_threshold} \
+                -num_threads {threads} \
+                -outfmt "6 qseqid qlen sseqid slen qstart qend sstart send evalue bitscore pident qcovs qcovhsp" \
+                -max_hsps 1 \
+                -max_target_seqs 1 2>>{log}
 
-            rm {params.output_dir}/blast_results/unmapped_sequences.fasta
+            rm {params.output_dir}/blast_results/unmapped_sequences.fasta 2>>{log}
         else
             touch {output.viruses_identified}
         fi
@@ -230,25 +258,50 @@ def get_fasta_for_virus(wildcards):
 def get_dataset_for_virus(wildcards):
     return get_virus_info(wildcards, 'localDataset')
 
+
+
+def get_nextclade_threads(wildcards):
+    try:
+        datasets_selected_file = checkpoints.select_datasets_from_nextclade.get().output.datasets_selected
+        viruses = set()
+        with open(datasets_selected_file, 'r') as f:
+            reader = csv.DictReader(f, delimiter='\t')
+            for row in reader:
+                if row.get('localDataset', None):
+                    viruses.add(row.get('localDataset'))
+        
+        count = len(viruses)
+        if count == 0:
+            return 1
+        return max(1, int(parameters.threads / count))
+    except Exception:
+        return 1
+
+
 rule nextclade:
     message:
         "Run nextclade for virus {wildcards.virus}"
     input:
         fasta = get_fasta_for_virus,
-        dataset = get_dataset_for_virus
+        dataset = get_dataset_for_virus,
+        id_mapping = rules.itemize_sequences.output.mapping
     output:
         nextclade_tsv = f"{parameters.output_dir}/nextclade_results/{{virus}}.nextclade.tsv",
-        nextclade_gff = f"{parameters.output_dir}/gff_files/{{virus}}.nextclade.gff"
+        nextclade_gff = f"{parameters.output_dir}/gff_files/{{virus}}.nextclade.gff",
+        nextclade_tbl = f"{parameters.output_dir}/tbl_files/{{virus}}.nextclade.tbl"
     threads:
-        parameters.threads
+        get_nextclade_threads
     log:
         f"{parameters.output_dir}/logs/nextclade.{{virus}}.log"
     shell:
         """
+        set -euo pipefail
+
         nextclade run \
             --input-dataset {input.dataset} \
             --output-tsv {output.nextclade_tsv}.tmp \
             --output-annotation-gff {output.nextclade_gff} \
+            --output-annotation-tbl {output.nextclade_tbl} \
             --min-seed-cover 0.05 \
             --jobs {threads} \
             {input.fasta} 2>{log}
@@ -257,9 +310,19 @@ rule nextclade:
         python {PKG_PATH}/scripts/python/reorder_cds.py \
             --nextclade-tsv {output.nextclade_tsv}.tmp \
             --gff {input.dataset}/genome_annotation.gff3 \
-            --output {output.nextclade_tsv}
+            --output {output.nextclade_tsv} 2>>{log}
 
         rm {output.nextclade_tsv}.tmp
+
+        # Split the multi-sample GFF into one file per sample
+        python {PKG_PATH}/scripts/python/split_gff_by_sample.py \
+            --gff {output.nextclade_gff} \
+            --id-mapping {input.id_mapping} 2>>{log}
+
+        # Split the multi-sample TBL into one file per sample
+        python {PKG_PATH}/scripts/python/split_tbl_by_sample.py \
+            --tbl {output.nextclade_tbl} \
+            --id-mapping {input.id_mapping} 2>>{log}
         """
 
 checkpoint process_blast_results:
@@ -281,32 +344,51 @@ def get_generic_nextclade_outputs(wildcards):
 
     return [f"{parameters.output_dir}/nextclade_results/{virus}.generic.nextclade.tsv" for virus in blast_viruses]
 
+def get_generic_nextclade_threads(wildcards):
+    try:
+        blast_viruses_list = checkpoints.process_blast_results.get().output.blast_viruses_list
+        count = 0
+        if os.path.exists(blast_viruses_list):
+            with open(blast_viruses_list, 'r') as f:
+                 count = sum(1 for line in f if line.strip())
+        
+        if count == 0:
+            return 1
+        return max(1, int(parameters.threads / count))
+    except Exception:
+        return 1
+
+
 rule run_generic_nextclade:
     message:
         "Run generic nextclade for blast identified virus {wildcards.virus}"
     input:
-        sequences = parameters.sequences_fasta,
+        sequences = rules.itemize_sequences.output.fasta,
         blast_results = rules.blast.output.viruses_identified,
-        blast_database = parameters.blast_database
+        blast_database = parameters.blast_database,
+        id_mapping = rules.itemize_sequences.output.mapping
     params:
         output_dir = parameters.output_dir,
         datasets_dir = parameters.datasets_local_path
     output:
         nextclade_tsv = f"{parameters.output_dir}/nextclade_results/{{virus}}.generic.nextclade.tsv",
-        nextclade_gff = f"{parameters.output_dir}/gff_files/{{virus}}.generic.nextclade.gff"
+        nextclade_gff = f"{parameters.output_dir}/gff_files/{{virus}}.generic.nextclade.gff",
+        nextclade_tbl = f"{parameters.output_dir}/tbl_files/{{virus}}.generic.nextclade.tbl"
     threads:
-        parameters.threads
+        get_generic_nextclade_threads
     log:
         f"{parameters.output_dir}/logs/generic_nextclade.{{virus}}.log"
     shell:
         """
+        set -euo pipefail
+
         # Get sequences for this virus from blast results
-        grep "{wildcards.virus}" {input.blast_results} | cut -f 1 > {params.output_dir}/blast_results/{wildcards.virus}.ids
-        seqtk subseq {input.sequences} {params.output_dir}/blast_results/{wildcards.virus}.ids > {params.output_dir}/blast_results/{wildcards.virus}.fasta
+        grep "{wildcards.virus}" {input.blast_results} | cut -f 1 > {params.output_dir}/blast_results/{wildcards.virus}.ids 2>>{log}
+        seqtk subseq {input.sequences} {params.output_dir}/blast_results/{wildcards.virus}.ids > {params.output_dir}/blast_results/{wildcards.virus}.fasta 2>>{log}
 
         # Get reference sequence from blast db
-        echo "{wildcards.virus}" > {params.output_dir}/blast_results/{wildcards.virus}.ref.id
-        seqtk subseq {input.blast_database} {params.output_dir}/blast_results/{wildcards.virus}.ref.id > {params.output_dir}/blast_results/{wildcards.virus}.ref.fasta
+        echo "{wildcards.virus}" > {params.output_dir}/blast_results/{wildcards.virus}.ref.id 2>>{log}
+        seqtk subseq {input.blast_database} {params.output_dir}/blast_results/{wildcards.virus}.ref.id > {params.output_dir}/blast_results/{wildcards.virus}.ref.fasta 2>>{log}
 
         # Check if GFF exists
         GFF_FILE="{params.datasets_dir}/blast_gff/{wildcards.virus}.gff"
@@ -318,6 +400,7 @@ rule run_generic_nextclade:
                 --input-annotation "$GFF_FILE" \
                 --output-tsv {output.nextclade_tsv}.tmp \
                 --output-annotation-gff {output.nextclade_gff} \
+                --output-annotation-tbl {output.nextclade_tbl} \
                 --min-seed-cover 0.05 \
                 --jobs {threads} \
                 {params.output_dir}/blast_results/{wildcards.virus}.fasta 2>>{log}
@@ -326,7 +409,7 @@ rule run_generic_nextclade:
             python {PKG_PATH}/scripts/python/reorder_cds.py \
                 --nextclade-tsv {output.nextclade_tsv}.tmp \
                 --gff "$GFF_FILE" \
-                --output {output.nextclade_tsv}
+                --output {output.nextclade_tsv} 2>>{log}
 
             rm {output.nextclade_tsv}.tmp
         else
@@ -338,6 +421,21 @@ rule run_generic_nextclade:
                 --jobs {threads} \
                 {params.output_dir}/blast_results/{wildcards.virus}.fasta 2>>{log}
             touch {output.nextclade_gff}
+            touch {output.nextclade_tbl}
+        fi
+
+        # Split the multi-sample GFF into one file per sample (skip if GFF is empty)
+        if [ -s {output.nextclade_gff} ]; then
+            python {PKG_PATH}/scripts/python/split_gff_by_sample.py \
+                --gff {output.nextclade_gff} \
+                --id-mapping {input.id_mapping} 2>>{log}
+        fi
+
+        # Split the multi-sample TBL into one file per sample (skip if TBL is empty)
+        if [ -s {output.nextclade_tbl} ]; then
+            python {PKG_PATH}/scripts/python/split_tbl_by_sample.py \
+                --tbl {output.nextclade_tbl} \
+                --id-mapping {input.id_mapping} 2>>{log}
         fi
 
         rm {params.output_dir}/blast_results/{wildcards.virus}.ids {params.output_dir}/blast_results/{wildcards.virus}.ref.id {params.output_dir}/blast_results/{wildcards.virus}.fasta {params.output_dir}/blast_results/{wildcards.virus}.ref.fasta
@@ -353,24 +451,30 @@ rule post_process_nextclade:
         blast_results = rules.blast.output.viruses_identified,
         unmapped_sequences = f"{parameters.output_dir}/identified_datasets/unmapped_sequences.txt",
         config_file = parameters.config_file,
-        blast_database_metadata = {parameters.blast_database_metadata}
+        blast_database_metadata = {parameters.blast_database_metadata},
+        id_mapping = rules.itemize_sequences.output.mapping
     params:
-        output_format = parameters.output_format
+        output_format = parameters.output_format,
+        output_dir = parameters.output_dir
     output:
         output_file = f"{parameters.output_dir}/{parameters.output_file}"
     log:
         f"{parameters.output_dir}/logs/pp_nextclade.log"
     shell:
         """
+        set -euo pipefail
+
         python {PKG_PATH}/scripts/python/post_process_nextclade.py \
             --files {input.nextclade_results} \
             --generic-files {input.generic_nextclade_results} \
             --unmapped-sequences {input.unmapped_sequences} \
             --blast-results {input.blast_results} \
             --blast-metadata {input.blast_database_metadata} \
+            --id-mapping {input.id_mapping} \
             --config-file {input.config_file} \
             --output {output.output_file} \
-            --output-format {params.output_format} 2>{log}
+            --output-format {params.output_format} \
+            --output-dir {params.output_dir} 2>{log}
         """
 
 rule extract_target_regions:
@@ -378,7 +482,8 @@ rule extract_target_regions:
         "Extracts the regions marked as good"
     input:
         sequences = parameters.sequences_fasta,
-        post_processed_data = rules.post_process_nextclade.output.output_file
+        post_processed_data = rules.post_process_nextclade.output.output_file,
+        id_mapping = rules.itemize_sequences.output.mapping
     params:
         output_format = parameters.output_format
     output:
@@ -390,12 +495,19 @@ rule extract_target_regions:
         f"{parameters.output_dir}/logs/extract_target_regions.log"
     shell:
         """
+        set -euo pipefail
+
         python {PKG_PATH}/scripts/python/extract_target_regions.py \
             --pp-results {input.post_processed_data} \
             --output-format {params.output_format} \
+            --id-mapping {input.id_mapping} \
             --output {output.target_regions_bed} 2>{log}
 
         # Remove range values (:start-end) that seqtk subseq includes in the header.
         seqtk subseq {input.sequences} {output.target_regions_bed} | \
-            sed -e 's/\:[0-9]*-[0-9]*$//g' > {output.target_regions_sequences} 2>{log}
+            sed -e 's/\:[0-9]*-[0-9]*$//g' > {output.target_regions_sequences} 2>>{log}
+        
+        # Clean up intermediate files
+        rm -rf {parameters.output_dir}/sequences_sanitized.fasta
+        find {parameters.output_dir}/identified_datasets/ -mindepth 1 -type d -exec rm -rf {{}} +
         """

@@ -24,6 +24,8 @@ from viralqc import (
     GET_NC_PUBLIC_DATASETS_SNK_PATH,
     GET_BLAST_DB_SNK_PATH,
 )
+from viralqc.commands.prepare_ncbi_submission.virus import virus_app
+from viralqc.commands.prepare_ncbi_submission.sample import sample_cmd
 
 # core config
 get_nc_datasets = GetNextcladeDatasets()
@@ -65,6 +67,15 @@ def log_multiline(text: str):
 app = typer.Typer()
 if __name__ == "__main__":
     app()
+
+ncbi_app = typer.Typer(
+    name="prepare-ncbi-submission",
+    help="Prepare NCBI submission packages from ViralQC outputs.",
+    no_args_is_help=True,
+)
+ncbi_app.add_typer(virus_app, name="virus")
+ncbi_app.command("sample")(sample_cmd)
+app.add_typer(ncbi_app, name="prepare-ncbi-submission")
 
 
 @app.command()
