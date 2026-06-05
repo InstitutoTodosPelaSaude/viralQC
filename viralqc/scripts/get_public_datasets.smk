@@ -74,9 +74,8 @@ rule get_nextclade_databases:
             --tag "{params.tag}" \
             --output-dir "{params.datasets_dir}/{wildcards.virus}"
 
-        for f in sequences.fasta tree.json; do
-            [ -f "{params.datasets_dir}/{wildcards.virus}/$f" ] || touch "{params.datasets_dir}/{wildcards.virus}/$f"
-        done
+        python {PKG_PATH}/scripts/python/normalize_nextclade_dataset_dir.py \
+            --output-dir "{params.datasets_dir}/{wildcards.virus}"
         """
 
 # Only define get_github_databases rule if there are github datasets
