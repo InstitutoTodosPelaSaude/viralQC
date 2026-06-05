@@ -528,11 +528,33 @@ nextclade_data:
     target_gene: "E"
     target_regions: ["C","prM","E"]
     private_mutation_total_threshold: 40
-github:
+  yellow-fever-prM-E:
+    dataset: "nextstrain/yellow-fever/prM-E"
+    tag: "2025-09-09--12-13-13Z"
+    virus_name: "Yellow fever virus"
+    virus_tax_id: 11089
+    virus_species: "Orthoflavivirus flavi"
+    virus_species_tax_id: 3046277
+    segment: "Unsegmented"
+    ncbi_id: "AY640589.1"
+    target_gene: "E"
+    target_regions: ["prM","E"]
+    private_mutation_total_threshold: 12
+  hmpv:
+    dataset: "nextstrain/hmpv/all-clades/NC_039199"
+    tag: "2025-09-09--12-13-13Z"
+    virus_name: "Human metapneumovirus"
+    virus_tax_id: 162145
+    virus_species: "Metapneumovirus hominis"
+    virus_species_tax_id: 3048148
+    segment: "Unsegmented"
+    ncbi_id: "NC_039199.1"
+    target_gene: "F"
+    target_regions: ["G","F"]
+    private_mutation_total_threshold: 200
   orov-tefe-l:
-    repository: "dezordi/nextclade_data_workflows"
-    dataset: "orov/datasets/L/tefe"
-    tag: "development"
+    dataset: "community/itps/orov/L/tefe"
+    tag: "2026-05-12--16-39-06Z"
     virus_name: "Oropouche virus"
     virus_tax_id: 118655
     virus_species: "Orthobunyavirus oropoucheense"
@@ -543,9 +565,8 @@ github:
     target_regions: ["L"]
     private_mutation_total_threshold: 15
   orov-refseq-l:
-    repository: "dezordi/nextclade_data_workflows"
-    dataset: "orov/datasets/L/refseq"
-    tag: "development"
+    dataset: "community/itps/orov/L/refseq"
+    tag: "2026-05-12--16-39-06Z"
     virus_name: "Oropouche virus"
     virus_tax_id: 118655
     virus_species: "Orthobunyavirus oropoucheense"
@@ -556,9 +577,8 @@ github:
     target_regions: ["L"]
     private_mutation_total_threshold: 15
   orov-tefe-m:
-    repository: "dezordi/nextclade_data_workflows"
-    dataset: "orov/datasets/M/tefe"
-    tag: "development"
+    dataset: "community/itps/orov/M/tefe"
+    tag: "2026-05-12--16-39-06Z"
     virus_name: "Oropouche virus"
     virus_tax_id: 118655
     virus_species: "Orthobunyavirus oropoucheense"
@@ -569,9 +589,8 @@ github:
     target_regions: ["M"]
     private_mutation_total_threshold: 15
   orov-refseq-m:
-    repository: "dezordi/nextclade_data_workflows"
-    dataset: "orov/datasets/M/refseq"
-    tag: "development"
+    dataset: "community/itps/orov/M/refseq"
+    tag: "2026-05-12--16-39-06Z"
     virus_name: "Oropouche virus"
     virus_tax_id: 118655
     virus_species: "Orthobunyavirus oropoucheense"
@@ -582,9 +601,8 @@ github:
     target_regions: ["M"]
     private_mutation_total_threshold: 15
   orov-tefe-s:
-    repository: "dezordi/nextclade_data_workflows"
-    dataset: "orov/datasets/S/tefe"
-    tag: "development"
+    dataset: "community/itps/orov/S/tefe"
+    tag: "2026-05-12--16-39-06Z"
     virus_name: "Oropouche virus"
     virus_tax_id: 118655
     virus_species: "Orthobunyavirus oropoucheense"
@@ -595,9 +613,8 @@ github:
     target_regions: ["N","NSs"]
     private_mutation_total_threshold: 15
   orov-refseq-s:
-    repository: "dezordi/nextclade_data_workflows"
-    dataset: "orov/datasets/S/refseq"
-    tag: "development"
+    dataset: "community/itps/orov/S/refseq"
+    tag: "2026-05-12--16-39-06Z"
     virus_name: "Oropouche virus"
     virus_tax_id: 118655
     virus_species: "Orthobunyavirus oropoucheense"
@@ -607,3 +624,327 @@ github:
     target_gene: "N"
     target_regions: ["N","NSs"]
     private_mutation_total_threshold: 15
+  measles-genome-WHO-2012:
+    dataset: "nextstrain/measles/genome/WHO-2012"
+    tag: "2026-04-14--11-55-23Z"
+    virus_name: "Measles morbillivirus"
+    virus_tax_id: 11234
+    virus_species: "Morbillivirus hominis"
+    virus_species_tax_id: 3052345
+    segment: "Unsegmented"
+    ncbi_id: "NC_001498.1"
+    target_gene: "N"
+    target_regions: ["N","H","F"]
+    private_mutation_total_threshold: 100
+  measles-N450-WHO-2012:
+    dataset: "nextstrain/measles/N450/WHO-2012"
+    tag: "2025-09-09--12-13-13Z"
+    virus_name: "Measles morbillivirus"
+    virus_tax_id: 11234
+    virus_species: "Morbillivirus hominis"
+    virus_species_tax_id: 3052345
+    segment: "Unsegmented"
+    ncbi_id: "NC_001498.1"
+    target_gene: "N"
+    target_regions: ["N"]
+    private_mutation_total_threshold: 8
+  mpox-all-clades:
+    dataset: "nextstrain/mpox/all-clades"
+    tag: "2026-04-14--11-55-23Z"
+    virus_name: "Mpox virus"
+    virus_tax_id: 10244
+    virus_species: "Orthopoxvirus monkeypox"
+    virus_species_tax_id: 3431483
+    segment: "Unsegmented"
+    ncbi_id: "NC_063383.1"
+    target_gene: "OPG057"
+    target_regions: ["OPG057"]
+    private_mutation_total_threshold: 300
+  mpox-clade-i:
+    dataset: "nextstrain/mpox/clade-i"
+    tag: "2026-04-14--11-55-23Z"
+    virus_name: "Mpox virus"
+    virus_tax_id: 10244
+    virus_species: "Orthopoxvirus monkeypox"
+    virus_species_tax_id: 3431483
+    segment: "Unsegmented"
+    ncbi_id: "DQ011155.1"
+    target_gene: "OPG057"
+    target_regions: ["OPG057"]
+    private_mutation_total_threshold: 50
+  mpox-clade-iib:
+    dataset: "nextstrain/mpox/clade-iib"
+    tag: "2026-04-14--11-55-23Z"
+    virus_name: "Mpox virus"
+    virus_tax_id: 10244
+    virus_species: "Orthopoxvirus monkeypox"
+    virus_species_tax_id: 3431483
+    segment: "Unsegmented"
+    ncbi_id: "NC_063383.1"
+    target_gene: "OPG057"
+    target_regions: ["OPG057"]
+    private_mutation_total_threshold: 50
+  mpox-lineage-b.1:
+    dataset: "nextstrain/mpox/lineage-b.1"
+    tag: "2026-04-14--11-55-23Z"
+    virus_name: "Mpox virus"
+    virus_tax_id: 10244
+    virus_species: "Orthopoxvirus monkeypox"
+    virus_species_tax_id: 3431483
+    segment: "Unsegmented"
+    ncbi_id: "NC_063383.1"
+    target_gene: "OPG057"
+    target_regions: ["OPG057"]
+    private_mutation_total_threshold: 50
+  mumps-genome:
+    dataset: "nextstrain/mumps/genome"
+    tag: "2026-04-14--11-55-23Z"
+    virus_name: "Mumps virus"
+    virus_tax_id: 11161
+    virus_species: "Orthorubulavirus parotitidis"
+    virus_species_tax_id: 3052560
+    segment: "Unsegmented"
+    ncbi_id: "D90232.1"
+    target_gene: "SH"
+    target_regions: ["HN","F","SH"]
+    private_mutation_total_threshold: 100
+  mumps-sh:
+    dataset: "nextstrain/mumps/sh"
+    tag: "2026-04-14--11-55-23Z"
+    virus_name: "Mumps virus"
+    virus_tax_id: 11161
+    virus_species: "Orthorubulavirus parotitidis"
+    virus_species_tax_id: 3052560
+    segment: "Unsegmented"
+    ncbi_id: "D90232.1"
+    target_gene: "SH"
+    target_regions: ["SH"]
+    private_mutation_total_threshold: 100
+  ebolavirus-ebov:
+    dataset: "nextstrain/orthoebolavirus/ebov"
+    tag: "2026-04-14--11-55-23Z"
+    virus_name: "Ebola virus"
+    virus_tax_id: 186538
+    virus_species: "Orthoebolavirus zairense"
+    virus_species_tax_id: 3052462
+    segment: "Unsegmented"
+    ncbi_id: "NC_002549.1"
+    target_gene: "GP"
+    target_regions: ["GP"]
+    private_mutation_total_threshold: 30
+  ebolavirus-sudv:
+    dataset: "nextstrain/orthoebolavirus/sudv"
+    tag: "2026-04-14--11-55-23Z"
+    virus_name: "Sudan virus"
+    virus_tax_id: 186540
+    virus_species: "Orthoebolavirus sudanense"
+    virus_species_tax_id: 3052460
+    segment: "Unsegmented"
+    ncbi_id: "NC_006432.1"
+    target_gene: "GP"
+    target_regions: ["GP"]
+    private_mutation_total_threshold: 300
+  ebolavirus-bdbv:
+    dataset: "nextstrain/orthoebolavirus/bdbv"
+    tag: "2026-05-22--16-04-17Z"
+    virus_name: "Bundibugyo virus"
+    virus_tax_id: 565995
+    virus_species: "Orthoebolavirus bundibugyoense"
+    virus_species_tax_id: 3052458
+    segment: "Unsegmented"
+    ncbi_id: "NC_014373.1"
+    target_gene: "GP"
+    target_regions: ["GP"]
+    private_mutation_total_threshold: 10
+  hantavirus-andv-l:
+    dataset: "nextstrain/orthohantavirus/andv/l"
+    tag: "2026-05-29--13-46-38Z"
+    virus_name: "Andes virus"
+    virus_tax_id: 1980456
+    virus_species: "Orthohantavirus andesense"
+    virus_species_tax_id: 1980456
+    segment: "L"
+    ncbi_id: "NC_003468.2"
+    target_gene: "RdRp"
+    target_regions: ["RdRp"]
+    private_mutation_total_threshold: 150
+  hantavirus-andv-m:
+    dataset: "nextstrain/orthohantavirus/andv/m"
+    tag: "2026-05-29--13-46-38Z"
+    virus_name: "Andes virus"
+    virus_tax_id: 1980456
+    virus_species: "Orthohantavirus andesense"
+    virus_species_tax_id: 1980456
+    segment: "M"
+    ncbi_id: "NC_003467.2"
+    target_gene: "GPC"
+    target_regions: ["GPC"]
+    private_mutation_total_threshold: 120
+  hantavirus-andv-s:
+    dataset: "nextstrain/orthohantavirus/andv/s"
+    tag: "2026-05-29--13-46-38Z"
+    virus_name: "Andes virus"
+    virus_tax_id: 1980456
+    virus_species: "Orthohantavirus andesense"
+    virus_species_tax_id: 1980456
+    segment: "S"
+    ncbi_id: "NC_003466.1"
+    target_gene: "N"
+    target_regions: ["N","NSs"]
+    private_mutation_total_threshold: 50
+  rubella-genome:
+    dataset: "nextstrain/rubella/genome"
+    tag: "2026-04-14--11-55-23Z"
+    virus_name: "Rubella virus"
+    virus_tax_id: 11041
+    virus_species: "Rubivirus rubellae"
+    virus_species_tax_id: 2846071
+    segment: "Unsegmented"
+    ncbi_id: "NC_076948.1"
+    target_gene: "NSP"
+    target_regions: ["NSP","SP"]
+    private_mutation_total_threshold: 100
+  rubella-E1:
+    dataset: "nextstrain/rubella/E1"
+    tag: "2026-04-14--11-55-23Z"
+    virus_name: "Rubella virus"
+    virus_tax_id: 11041
+    virus_species: "Rubivirus rubellae"
+    virus_species_tax_id: 2846071
+    segment: "Unsegmented"
+    ncbi_id: "NC_001545.2"
+    target_gene: "E1"
+    target_regions: ["E1"]
+    private_mutation_total_threshold: 45
+  wnv-all-lineages:
+    dataset: "nextstrain/wnv/all-lineages"
+    tag: "2026-04-14--11-55-23Z"
+    virus_name: "West Nile virus"
+    virus_tax_id: 11082
+    virus_species: "Orthoflavivirus nilense"
+    virus_species_tax_id: 3048448
+    segment: "Unsegmented"
+    ncbi_id: "NC_009942.1"
+    target_gene: "env"
+    target_regions: ["prM","env"]
+    private_mutation_total_threshold: 200
+  vzv-NC_001348:
+    dataset: "nextstrain/herpes/vzv/NC_001348"
+    tag: "2026-04-14--11-55-23Z"
+    virus_name: "Varicella-zoster virus"
+    virus_tax_id: 10335
+    virus_species: "Varicellovirus humanalpha3"
+    virus_species_tax_id: 3050294
+    segment: "Unsegmented"
+    ncbi_id: "NC_001348.1"
+    target_gene: "ORF22"
+    target_regions: ["ORF22"]
+    private_mutation_total_threshold: 100
+  cchfv-l:
+    dataset: "community/pathoplexus/cchfv/L"
+    tag: "2025-09-24--07-29-03Z"
+    virus_name: "Crimean-Congo hemorrhagic fever virus"
+    virus_tax_id: 3052518
+    virus_species: "Orthonairovirus haemorrhagiae"
+    virus_species_tax_id: 3052518
+    segment: "L"
+    ncbi_id: "NC_005301.3"
+    target_gene: "RdRp"
+    target_regions: ["RdRp"]
+    private_mutation_total_threshold: 200
+  cchfv-m:
+    dataset: "community/pathoplexus/cchfv/M"
+    tag: "2025-09-24--07-29-03Z"
+    virus_name: "Crimean-Congo hemorrhagic fever virus"
+    virus_tax_id: 3052518
+    virus_species: "Orthonairovirus haemorrhagiae"
+    virus_species_tax_id: 3052518
+    segment: "M"
+    ncbi_id: "NC_005300.2"
+    target_gene: "GPC"
+    target_regions: ["GPC"]
+    private_mutation_total_threshold: 200
+  cchfv-s:
+    dataset: "community/pathoplexus/cchfv/S"
+    tag: "2025-09-24--07-29-03Z"
+    virus_name: "Crimean-Congo hemorrhagic fever virus"
+    virus_tax_id: 3052518
+    virus_species: "Orthonairovirus haemorrhagiae"
+    virus_species_tax_id: 3052518
+    segment: "S"
+    ncbi_id: "NC_005302.1"
+    target_gene: "NP"
+    target_regions: ["NP"]
+    private_mutation_total_threshold: 200
+  iav-h5-ha-all-clades:
+    dataset: "community/moncla-lab/iav-h5/ha/all-clades"
+    tag: "2026-04-14--11-55-23Z"
+    virus_name: "Influenza A H5Nx"
+    virus_tax_id: 11320
+    virus_species: "Alphainfluenzavirus influenzae"
+    virus_species_tax_id: 2955291
+    segment: "HA"
+    ncbi_id: "AF144305.1"
+    target_gene: "HA1"
+    target_regions: ["HA1", "SigPep"]
+    private_mutation_total_threshold: 97
+  iav-h5-ha-2.3.2.1:
+    dataset: "community/moncla-lab/iav-h5/ha/2.3.2.1"
+    tag: "2026-04-14--11-55-23Z"
+    virus_name: "Influenza A H5Nx"
+    virus_tax_id: 11320
+    virus_species: "Alphainfluenzavirus influenzae"
+    virus_species_tax_id: 2955291
+    segment: "HA"
+    ncbi_id: "EPI424984"
+    target_gene: "HA1"
+    target_regions: ["HA1", "SigPep"]
+    private_mutation_total_threshold: 25
+  iav-h5-ha-2.3.4.4:
+    dataset: "community/moncla-lab/iav-h5/ha/2.3.4.4"
+    tag: "2026-04-14--11-55-23Z"
+    virus_name: "Influenza A H5Nx"
+    virus_tax_id: 11320
+    virus_species: "Alphainfluenzavirus influenzae"
+    virus_species_tax_id: 2955291
+    segment: "HA"
+    ncbi_id: "EPI1846961"
+    target_gene: "HA1"
+    target_regions: ["HA1", "SigPep"]
+    private_mutation_total_threshold: 18
+  hav-whole-genome:
+    dataset: "community/masphl-bioinformatics/hav/whole-genome"
+    tag: "2025-12-02--12-30-02Z"
+    virus_name: "Hepatitis A virus"
+    virus_tax_id: 12092
+    virus_species: "Hepatovirus fejalco"
+    virus_species_tax_id: 3429217
+    segment: "Unsegmented"
+    ncbi_id: "NC_001489.1"
+    target_gene: "VP1"
+    target_regions: ["VP1"]
+    private_mutation_total_threshold: 150
+  hav-vp1-2b-junction:
+    dataset: "community/masphl-bioinformatics/hav/vp1-2b-junction"
+    tag: "2025-12-02--12-30-02Z"
+    virus_name: "Hepatitis A virus"
+    virus_tax_id: 12092
+    virus_species: "Hepatovirus fejalco"
+    virus_species_tax_id: 3429217
+    segment: "Unsegmented"
+    ncbi_id: "NC_001489.1"
+    target_gene: "VP1truncated"
+    target_regions: ["VP1truncated"]
+    private_mutation_total_threshold: 100
+  marburg-all-lineages:
+    dataset: "community/genspectrum/marburg/HK1980/all-lineages"
+    tag: "2025-09-09--12-13-13Z"
+    virus_name: "Marburg virus"
+    virus_tax_id: 11269
+    virus_species: "Orthomarburgvirus marburgense"
+    virus_species_tax_id: 3052505
+    segment: "Unsegmented"
+    ncbi_id: "NC_001608.3"
+    target_gene: "GP"
+    target_regions: ["GP"]
+    private_mutation_total_threshold: 200
