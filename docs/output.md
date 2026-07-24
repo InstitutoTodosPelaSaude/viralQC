@@ -86,6 +86,12 @@ never coerced to `1.0`/`6.0`.
 | `clade_nextstrain` | String | Nextstrain clade designation |
 | `clade_display` | String | Display clade designation |
 
+> Compatibility (v1.1.0): these columns were **added** to `results.tsv`; no existing
+> column was removed or renamed, but the new columns are inserted after `clade`, so
+> the overall column order changed. Consumers that read by column **name** (the
+> recommended approach) are unaffected; any consumer relying on column **position**
+> must be updated.
+
 
 ##### 2. Quality Metrics (ViralQC A-D System)
 

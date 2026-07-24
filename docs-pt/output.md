@@ -85,6 +85,12 @@ convertidos para `1.0`/`6.0`.
 | `clade_nextstrain` | String | Designação de clado do Nextstrain |
 | `clade_display` | String | Designação de clado para exibição |
 
+> Compatibilidade (v1.1.0): estas colunas foram **adicionadas** ao `results.tsv`;
+> nenhuma coluna existente foi removida ou renomeada, mas as novas colunas são
+> inseridas após `clade`, portanto a ordem geral das colunas mudou. Consumidores que
+> leem por **nome** de coluna (a abordagem recomendada) não são afetados; qualquer
+> consumidor que dependa da **posição** da coluna precisa ser atualizado.
+
 ##### 2. Métricas de Qualidade (Sistema A-D do ViralQC)
 
 | Coluna | Tipo | Descrição |
