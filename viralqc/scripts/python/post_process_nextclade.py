@@ -31,6 +31,26 @@ TARGET_COLUMNS = {
     "segment": str,
     "ncbi_id": str,
     "clade": str,
+    # Alternative clade/lineage designations emitted by various Nextclade datasets.
+    # Retained so a build can select the right one via viralqc.clade_column; reindex
+    # in _sanitize_dataframe fills NaN for datasets that do not emit a given column.
+    # Motivation: Nextclade's 2025-10-22 seasonal-flu change made the new short
+    # "subclade" the default `clade` and moved the classic 6B.1A.5a.2a to
+    # `legacy-clade`. Column names vary by dataset: hMPV uses the underscore form
+    # `legacy_clade`; the combined flu-B dataset uses per-lineage suffixes
+    # (`legacy-clade-vic`/`-yam`); mpox/Ebola carry finer `lineage`/`outbreak`.
+    "legacy-clade": str,
+    "legacy_clade": str,
+    "legacy-clade-vic": str,
+    "legacy-clade-yam": str,
+    "subclade": str,
+    "short-clade": str,
+    "proposedSubclade": str,
+    "lineage": str,
+    "outbreak": str,
+    "clade_who": str,
+    "clade_nextstrain": str,
+    "clade_display": str,
     "targetRegions": str,
     "targetGene": str,
     "genomeQuality": str,
@@ -110,9 +130,41 @@ CATEGORICAL_COLUMNS = [
     "segment",
     "ncbi_id",
     "clade",
+    "legacy-clade",
+    "legacy_clade",
+    "legacy-clade-vic",
+    "legacy-clade-yam",
+    "subclade",
+    "short-clade",
+    "proposedSubclade",
+    "lineage",
+    "outbreak",
+    "clade_who",
+    "clade_nextstrain",
+    "clade_display",
     "dataset",
     "datasetVersion",
 ]
+
+# Clade/lineage designation columns. Read as strings so all-integer values
+# (e.g. flu legacy clade 1, 6, 7) are never coerced to float ('1.0') at read
+# time. Kept narrow (not dtype=str for the whole file) because numeric columns
+# such as `coverage` are compared numerically before _sanitize_dataframe runs.
+CLADE_LIKE_COLUMNS = (
+    "clade",
+    "legacy-clade",
+    "legacy_clade",
+    "legacy-clade-vic",
+    "legacy-clade-yam",
+    "subclade",
+    "short-clade",
+    "proposedSubclade",
+    "lineage",
+    "outbreak",
+    "clade_who",
+    "clade_nextstrain",
+    "clade_display",
+)
 
 
 def load_blast_metadata(metadata_path: Path) -> DataFrame:
@@ -788,7 +840,13 @@ def format_dfs(
 
     for file in files:
         try:
-            df = read_csv(file, sep="\t", header=0)
+            # Force clade-like columns to string so an all-integer legacy-clade
+            # (flu `1`,`6`,`7`) is not inferred as float and rendered `1.0`,`6.0`
+            # (which would split into phantom clade categories). Other columns keep
+            # inferred dtypes — `coverage` etc. are used numerically before sanitize.
+            df = read_csv(
+                file, sep="\t", header=0, dtype={c: str for c in CLADE_LIKE_COLUMNS}
+            )
             df = df.loc[:, ~df.columns.duplicated()]
         except EmptyDataError:
             df = DataFrame(columns=list(TARGET_COLUMNS.keys()))
@@ -940,7 +998,22 @@ def _sanitize_dataframe(df: DataFrame) -> DataFrame:
             elif dtype == str:
                 df[col] = df[col].astype("string")
 
-    final_df = df[list(TARGET_COLUMNS.keys())].round(4)
+    # reindex (not df[[...]]) so datasets whose Nextclade output lacks an
+    # optional column (e.g. 'legacy-clade', present only for influenza HA)
+    # get it filled with NaN instead of raising KeyError.
+    #
+    # reindex silently tolerates ANY missing column, which would mask a genuine
+    # upstream schema break. Guard the small set of columns that every processed
+    # chunk must carry so such a break fails loudly instead of emitting all-null.
+    _REQUIRED = ("seqName", "clade", "coverage", "genomeQuality")
+    _missing_required = [c for c in _REQUIRED if c not in df.columns]
+    if _missing_required:
+        raise KeyError(
+            "ViralQC post-processing: required column(s) "
+            f"{_missing_required} absent from the processed Nextclade output; "
+            "the dataset schema may have changed."
+        )
+    final_df = df.reindex(columns=list(TARGET_COLUMNS.keys())).round(4)
     final_df = final_df.replace(r"^\s*$", nan, regex=True)
     return final_df
 
