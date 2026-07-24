@@ -58,6 +58,35 @@ This is the file containing consolidated results from all analyses:
 | `clade` | String | Phylogenetic clade (when available) |
 
 
+##### 1b. Alternative Clade / Lineage Designations
+
+Nextclade datasets may emit more than one clade/lineage label per sequence. ViralQC
+retains these alongside `clade` so downstream tools can select the meaningful
+designation for each dataset. Columns not emitted by a given dataset's Nextclade
+output are filled empty/NaN. All of these columns are read and stored as strings, so
+all-integer legacy clades (e.g. influenza `1`, `6`, `7`) are preserved verbatim and
+never coerced to `1.0`/`6.0`.
+
+> Context: Nextclade's 2025-10-22 seasonal-flu update made the new short `subclade`
+> the default `clade` and moved the classic designation (e.g. `6B.1A.5a.2a`) to
+> `legacy-clade`. Column naming varies by dataset.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `legacy-clade` | String | Legacy/classic clade designation (e.g. influenza HA `6B.1A.5a.2a`) |
+| `legacy_clade` | String | Legacy clade, underscore form (e.g. hMPV dataset) |
+| `legacy-clade-vic` | String | Legacy clade for the Victoria lineage (combined influenza B dataset) |
+| `legacy-clade-yam` | String | Legacy clade for the Yamagata lineage (combined influenza B dataset) |
+| `subclade` | String | Short subclade designation (new default `clade` for seasonal flu) |
+| `short-clade` | String | Short clade designation |
+| `proposedSubclade` | String | Proposed (candidate) subclade designation |
+| `lineage` | String | Finer lineage designation (e.g. mpox, Ebola) |
+| `outbreak` | String | Outbreak designation (e.g. Ebola) |
+| `clade_who` | String | WHO clade designation |
+| `clade_nextstrain` | String | Nextstrain clade designation |
+| `clade_display` | String | Display clade designation |
+
+
 ##### 2. Quality Metrics (ViralQC A-D System)
 
 | Column | Type | Description |
