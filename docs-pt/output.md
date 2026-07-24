@@ -56,6 +56,41 @@ Este é o arquivo que contém os resultados consolidados de todas as análises:
 | `datasetVersion` | String | Versão/tag do dataset |
 | `clade` | String | Clado filogenético (quando disponível) |
 
+##### 1b. Designações Alternativas de Clado / Linhagem
+
+Os datasets do Nextclade podem emitir mais de um rótulo de clado/linhagem por
+sequência. O ViralQC mantém esses rótulos junto de `clade`, para que ferramentas
+posteriores possam escolher a designação adequada a cada dataset. Colunas não emitidas
+pela saída do Nextclade de um dado dataset são preenchidas como vazio/NaN. Todas essas
+colunas são lidas e armazenadas como strings, de modo que clados legados totalmente
+numéricos (ex.: influenza `1`, `6`, `7`) são preservados literalmente e nunca
+convertidos para `1.0`/`6.0`.
+
+> Contexto: a atualização de gripe sazonal do Nextclade de 2025-10-22 tornou o novo
+> `subclade` curto o `clade` padrão e moveu a designação clássica (ex.: `6B.1A.5a.2a`)
+> para `legacy-clade`. A nomenclatura das colunas varia conforme o dataset.
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `legacy-clade` | String | Designação de clado legada/clássica (ex.: HA de influenza `6B.1A.5a.2a`) |
+| `legacy_clade` | String | Clado legado, na forma com underscore (ex.: dataset de hMPV) |
+| `legacy-clade-vic` | String | Clado legado para a linhagem Victoria (dataset combinado de influenza B) |
+| `legacy-clade-yam` | String | Clado legado para a linhagem Yamagata (dataset combinado de influenza B) |
+| `subclade` | String | Designação de subclado curta (novo `clade` padrão para gripe sazonal) |
+| `short-clade` | String | Designação de clado curta |
+| `proposedSubclade` | String | Designação de subclado proposta (candidata) |
+| `lineage` | String | Designação de linhagem mais fina (ex.: mpox, Ebola) |
+| `outbreak` | String | Designação de surto (ex.: Ebola) |
+| `clade_who` | String | Designação de clado da OMS |
+| `clade_nextstrain` | String | Designação de clado do Nextstrain |
+| `clade_display` | String | Designação de clado para exibição |
+
+> Compatibilidade (v1.1.0): estas colunas foram **adicionadas** ao `results.tsv`;
+> nenhuma coluna existente foi removida ou renomeada, mas as novas colunas são
+> inseridas após `clade`, portanto a ordem geral das colunas mudou. Consumidores que
+> leem por **nome** de coluna (a abordagem recomendada) não são afetados; qualquer
+> consumidor que dependa da **posição** da coluna precisa ser atualizado.
+
 ##### 2. Métricas de Qualidade (Sistema A-D do ViralQC)
 
 | Coluna | Tipo | Descrição |
