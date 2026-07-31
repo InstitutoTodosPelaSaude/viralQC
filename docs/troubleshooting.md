@@ -92,15 +92,27 @@ contains:
 BLAST query error: CFastaReader: Near line 2, there's a line that doesn't look like plausible data, but it's not marked as defline or comment.
 ```
 
-**Cause:** the input FASTA contains a record made up entirely of alignment gap
-characters (`-` or `.`), typically an empty consensus exported as an alignment
-row. `blastn` refuses such a record, and because the rule runs under
-`set -euo pipefail` the failure aborted the whole run.
+**Cause:** `blastn`'s FASTA reader rejects the whole query file when a line looks
+implausible, and it does so on a sliding scale: measured against a real database
+it aborts once a line falls below roughly **one third** plausible residues — not
+only when a record is 100% gaps. So both an empty consensus exported as an
+all-gap alignment row and a heavily gapped partial genome could trigger it.
+Because the rule runs under `set -euo pipefail`, that one record aborted the
+whole run and discarded every other sequence's results.
 
-**Solution:** upgrade to **v1.2.0 or later**. Records with no usable base are
-now excluded from Nextclade and BLAST, listed in `excluded_sequences.tsv`, and
-reported in `results.tsv` with `inputSequenceStatus` set to
-`no usable sequence`. No change to the input file is required.
+**Solution:** upgrade to **v1.2.0 or later**, which addresses this in two layers:
+
+1. Alignment gaps (`-` and `.`) are stripped from every sequence, and records
+   left with no usable base are excluded from Nextclade and BLAST, listed in
+   `excluded_sequences.tsv`, and reported in `results.tsv` with
+   `inputSequenceStatus` set to `no usable sequence`.
+2. A non-zero `blastn` exit is no longer fatal. It is logged to
+   `output/logs/blast.log` and the run continues with no BLAST hits, so other
+   padding conventions that ViralQC does not strip — NEXUS-style `?`, for
+   instance — degrade to "unidentified" instead of discarding the whole run.
+   Affected sequences appear as `Unclassified`.
+
+No change to the input file is required.
 
 On earlier versions, strip the gaps and drop the empty records before running
 (`-l 0` puts each sequence on a single line, which the filter relies on):

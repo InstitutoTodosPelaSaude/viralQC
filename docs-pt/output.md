@@ -198,6 +198,12 @@ linha em `results.tsv`, com `genomeQuality` `D`, `coverage` `0` e `virus`
 sequências de entrada. O motivo de cada sequência está em
 `excluded_sequences.tsv`.
 
+Note a diferença em relação a uma sequência apenas não identificada: uma sequência
+que passou pelo Nextclade e pelo BLAST sem corresponder a nada recebe `virus`
+`Unclassified` com `genomeQuality` **vazio** (nenhuma qualidade foi calculada). Uma
+sequência excluída por não ter base utilizável recebe `genomeQuality` `D` e um
+`inputSequenceStatus` não vazio. Filtre por `inputSequenceStatus` para distinguir as duas.
+
 ### excluded_sequences.tsv
 
 Lista as sequências de entrada excluídas da análise por não possuírem nenhuma
@@ -208,7 +214,7 @@ foi excluído.
 |--------|------|-----------|
 | `id` | Integer | ID sequencial sanitizado atribuído à sequência |
 | `original_header` | String | Cabeçalho como aparece no FASTA de entrada |
-| `reason` | String | Motivo da exclusão (`only gap characters`, `only ambiguous bases` ou `empty record`) |
+| `reason` | String | Motivo da exclusão. Um de `no usable sequence: only gap characters`, `no usable sequence: only ambiguous bases`, `no usable sequence: empty record` |
 | `length` | Integer | Tamanho do registro no arquivo de entrada, antes da remoção dos gaps |
 
 **Nota sobre formatos de saída:**

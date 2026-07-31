@@ -200,6 +200,12 @@ or an empty record. Such sequences still get a row in `results.tsv`, with
 always matches the number of input sequences. The per-sequence reason is in
 `excluded_sequences.tsv`.
 
+Note the difference from a merely unidentified sequence: a sequence that reached
+Nextclade and BLAST but matched nothing gets `virus` `Unclassified` with
+`genomeQuality` left **empty** (no quality was computed). A sequence excluded for
+holding no usable base gets `genomeQuality` `D` and a non-empty
+`inputSequenceStatus`. Filter on `inputSequenceStatus` to tell the two apart.
+
 ### excluded_sequences.tsv
 
 Lists the input sequences that were excluded from the analysis for holding no
@@ -210,7 +216,7 @@ excluded.
 |--------|------|-------------|
 | `id` | Integer | Sanitized sequential ID assigned to the sequence |
 | `original_header` | String | Header as it appears in the input FASTA |
-| `reason` | String | Why the sequence was excluded (`only gap characters`, `only ambiguous bases` or `empty record`) |
+| `reason` | String | Why the sequence was excluded. One of `no usable sequence: only gap characters`, `no usable sequence: only ambiguous bases`, `no usable sequence: empty record` |
 | `length` | Integer | Length of the record in the input file, before gap removal |
 
 **Note on output formats:**
