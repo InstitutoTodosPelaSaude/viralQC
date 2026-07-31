@@ -51,13 +51,15 @@ rule itemize_sequences:
         sequences = parameters.sequences_fasta
     output:
         fasta = f"{parameters.output_dir}/sequences_sanitized.fasta",
-        mapping = f"{parameters.output_dir}/identified_datasets/id_mapping.tsv"
+        mapping = f"{parameters.output_dir}/identified_datasets/id_mapping.tsv",
+        excluded = f"{parameters.output_dir}/excluded_sequences.tsv"
     shell:
         """
         python {PKG_PATH}/scripts/python/itemize_sequences.py \
             --input {input.sequences} \
             --output-fasta {output.fasta} \
-            --output-mapping {output.mapping}
+            --output-mapping {output.mapping} \
+            --output-excluded {output.excluded}
         """
 
 _run_counters = {}
@@ -213,6 +215,17 @@ rule blast:
         mkdir -p {params.output_dir}/blast_results 2>>{log}
         if [ -s {input.unmapped_sequences} ]; then
             seqtk subseq {input.sequences} {input.unmapped_sequences} > {params.output_dir}/blast_results/unmapped_sequences.fasta 2>>{log}
+
+            # blastn aborts on a record holding no base at all, which under
+            # `set -euo pipefail` would kill the whole workflow. itemize_sequences
+            # already keeps such records out of the sanitized FASTA; this guard
+            # keeps the rule safe if an empty query set ever reaches it.
+            if ! grep -qE '^[^>[:space:]]*[ACGTUacgtu]' {params.output_dir}/blast_results/unmapped_sequences.fasta; then
+                echo "No unmapped sequence carries a usable base; skipping blastn." >>{log}
+                touch {output.viruses_identified}
+                rm -f {params.output_dir}/blast_results/unmapped_sequences.fasta
+                exit 0
+            fi
 
             blastn \
                 -query {params.output_dir}/blast_results/unmapped_sequences.fasta \
