@@ -645,3 +645,48 @@ class TestWriteOutputWithOnlyExcludedSequences:
         rows = list(csv.DictReader(out.open(newline=""), delimiter="\t"))
         assert rows[0]["seqName"] == "ITpS_real_header"
         assert rows[0]["inputSequenceStatus"] == UNUSABLE_SEQUENCE_STATUS
+
+
+# ── format_nextclade_sort: empty nextclade sort output ────────────────────────
+
+from viralqc.scripts.python.format_nextclade_sort import (
+    read_nextclade_sort_tsv,
+    format_nextclade_output,
+)
+
+
+class TestReadNextcladeSortTsv:
+    """nextclade sort writes a header-less, zero-byte table when handed a FASTA
+    with no records, which happens when every input sequence was excluded for
+    holding no usable base."""
+
+    def test_reads_a_normal_table(self, tmp_path):
+        p = tmp_path / "viruses.tsv"
+        p.write_text("index\tseqName\tdataset\tscore\tnumHits\n0\t1\tdenv2\t0.4\t283\n")
+        df = read_nextclade_sort_tsv(p)
+        assert len(df) == 1
+        assert df.iloc[0]["seqName"] == "1"
+
+    def test_empty_file_yields_empty_frame_with_schema(self, tmp_path):
+        p = tmp_path / "viruses.tsv"
+        p.write_text("")
+        df = read_nextclade_sort_tsv(p)
+        assert df.empty
+        for col in ("index", "seqName", "dataset", "score", "numHits"):
+            assert col in df.columns
+
+    def test_header_only_file_yields_empty_frame(self, tmp_path):
+        p = tmp_path / "viruses.tsv"
+        p.write_text("index\tseqName\tdataset\tscore\tnumHits\n")
+        df = read_nextclade_sort_tsv(p)
+        assert df.empty
+
+    def test_format_nextclade_output_survives_two_empty_tables(self, tmp_path):
+        a = tmp_path / "viruses.tsv"
+        b = tmp_path / "viruses.external_datasets.tsv"
+        a.write_text("")
+        b.write_text("")
+        df = format_nextclade_output(a, b, {})
+        assert df.empty
+        assert "localDataset" in df.columns
+        assert "splittedFasta" in df.columns
