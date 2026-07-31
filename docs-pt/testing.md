@@ -91,6 +91,7 @@ Testa funções auxiliares puras de cada script. Pontos de entrada com muita I/O
 | `TestParseFastaLengths` / `TestCleanCdsName` | `jsonl_to_gff` |
 | `TestStripGaps` / `TestUnusableReason` / `TestItemizeSequences` | `itemize_sequences` |
 | `TestCreateExcludedDf` / `TestWriteOutputWithOnlyExcludedSequences` | `post_process_nextclade` |
+| `TestDownloadRetry` | Helper de retry dos downloads do `get_blast_database.smk` |
 
 ## Escrevendo novos testes
 

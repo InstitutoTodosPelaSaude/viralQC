@@ -91,6 +91,7 @@ Tests pure-Python helper functions from each script. I/O-heavy entry points (`ma
 | `TestParseFastaLengths` / `TestCleanCdsName` | `jsonl_to_gff` |
 | `TestStripGaps` / `TestUnusableReason` / `TestItemizeSequences` | `itemize_sequences` |
 | `TestCreateExcludedDf` / `TestWriteOutputWithOnlyExcludedSequences` | `post_process_nextclade` |
+| `TestDownloadRetry` | `get_blast_database.smk` download retry helper |
 
 ## Writing new tests
 
