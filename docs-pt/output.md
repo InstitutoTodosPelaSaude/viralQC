@@ -33,6 +33,7 @@ output/             # Diretório de saída especificado pelo usuário (ex: --out
     │   ├── blast.log
     │   └── ...
     ├── results.tsv
+    ├── excluded_sequences.tsv
     ├── sequences_target_regions.bed
     └── sequences_target_regions.fasta
 ```
@@ -178,6 +179,37 @@ convertidos para `1.0`/`6.0`.
 | `privateNucMutations.totalLabeledSubstitutions` | Integer | Total de mutações privadas conhecidas/catalogadas |
 | `privateNucMutations.totalUnlabeledSubstitutions` | Integer | Total de mutações privadas não catalogadas |
 | `privateNucMutations.totalReversionSubstitutions` | Integer | Total de reversões (mutações que revertem à referência ancestral) |
+
+##### 8. Situação da Sequência de Entrada
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `inputSequenceStatus` | String | Vazia para toda sequência analisada. Recebe `no usable sequence` quando o registro de entrada não possuía nenhuma base utilizável e, portanto, foi excluído do Nextclade e do BLAST |
+
+Incluída na **v1.2.0**. A coluna é acrescentada após `datasetVersion`, de modo
+que a ordem de todas as colunas pré-existentes permanece inalterada.
+
+Uma sequência é considerada sem base utilizável quando, após a remoção dos gaps
+de alinhamento (`-` e `.`), não contém nenhum `A`, `C`, `G`, `T` ou `U` — ou
+seja, um registro composto apenas por gaps, apenas por `N`, apenas por códigos
+de ambiguidade, ou um registro vazio. Essas sequências continuam recebendo uma
+linha em `results.tsv`, com `genomeQuality` `D`, `coverage` `0` e `virus`
+`Unclassified`, de forma que o número de linhas sempre corresponde ao número de
+sequências de entrada. O motivo de cada sequência está em
+`excluded_sequences.tsv`.
+
+### excluded_sequences.tsv
+
+Lista as sequências de entrada excluídas da análise por não possuírem nenhuma
+base utilizável. Escrito em toda execução; contém apenas o cabeçalho quando nada
+foi excluído.
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | Integer | ID sequencial sanitizado atribuído à sequência |
+| `original_header` | String | Cabeçalho como aparece no FASTA de entrada |
+| `reason` | String | Motivo da exclusão (`only gap characters`, `only ambiguous bases` ou `empty record`) |
+| `length` | Integer | Tamanho do registro no arquivo de entrada, antes da remoção dos gaps |
 
 **Nota sobre formatos de saída:**
 - **TSV/CSV**: Todas as colunas são strings ou valores numéricos

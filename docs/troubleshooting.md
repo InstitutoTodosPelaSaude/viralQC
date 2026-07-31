@@ -83,6 +83,32 @@ vqc run-from-fasta \
 2. Verify tag/branch exists
 3. Check GitHub connectivity: `ping github.com`
 
+## Problem 8: BLAST rejects a sequence as implausible data
+
+**Symptom:** the run stops at the `blast` rule and `output/logs/blast.log`
+contains:
+
+```
+BLAST query error: CFastaReader: Near line 2, there's a line that doesn't look like plausible data, but it's not marked as defline or comment.
+```
+
+**Cause:** the input FASTA contains a record made up entirely of alignment gap
+characters (`-` or `.`), typically an empty consensus exported as an alignment
+row. `blastn` refuses such a record, and because the rule runs under
+`set -euo pipefail` the failure aborted the whole run.
+
+**Solution:** upgrade to **v1.2.0 or later**. Records with no usable base are
+now excluded from Nextclade and BLAST, listed in `excluded_sequences.tsv`, and
+reported in `results.tsv` with `inputSequenceStatus` set to
+`no usable sequence`. No change to the input file is required.
+
+On earlier versions, strip the gaps and drop the empty records before running
+(`-l 0` puts each sequence on a single line, which the filter relies on):
+
+```bash
+seqtk seq -A -l 0 input.fasta | awk '/^>/{h=$0; next} {gsub(/[-.]/,"",$0); if (length($0)>0) print h"\n"$0}' > cleaned.fasta
+```
+
 ## Getting Help
 
 - [GitHub Issues](https://github.com/InstitutoTodosPelaSaude/viralQC/issues)
