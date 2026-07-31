@@ -323,3 +323,294 @@ class TestCleanCdsName:
     def test_colon_truncation(self):
         result = clean_cds_name("gene_A: details")
         assert ":" not in result
+
+
+# ── itemize_sequences ─────────────────────────────────────────────────────────
+
+from viralqc.scripts.python.itemize_sequences import (
+    strip_gaps,
+    unusable_reason,
+    itemize_sequences,
+)
+
+
+class TestStripGaps:
+    def test_removes_hyphen_gaps(self):
+        assert strip_gaps("ACGT----ACGT") == "ACGTACGT"
+
+    def test_removes_dot_gaps(self):
+        assert strip_gaps("ACGT....ACGT") == "ACGTACGT"
+
+    def test_removes_mixed_gap_characters(self):
+        assert strip_gaps("AC-GT.ACGT-") == "ACGTACGT"
+
+    def test_preserves_case(self):
+        assert strip_gaps("acgt--ACGT") == "acgtACGT"
+
+    def test_leaves_gapless_sequence_untouched(self):
+        assert strip_gaps("ACGTNNNN") == "ACGTNNNN"
+
+    def test_all_gaps_becomes_empty(self):
+        assert strip_gaps("--------") == ""
+
+
+class TestUnusableReason:
+    def test_normal_sequence_is_usable(self):
+        assert unusable_reason("ACGTACGT") is None
+
+    def test_lowercase_sequence_is_usable(self):
+        assert unusable_reason("acgtacgt") is None
+
+    def test_partially_gapped_sequence_is_usable(self):
+        assert unusable_reason("ACGT----ACGT") is None
+
+    def test_mostly_n_with_one_base_is_usable(self):
+        assert unusable_reason("NNNNNNNACNNNNNN") is None
+
+    def test_rna_uracil_is_usable(self):
+        assert unusable_reason("ACGUACGU") is None
+
+    def test_all_hyphen_gaps_is_unusable(self):
+        reason = unusable_reason("-" * 100)
+        assert reason is not None
+        assert "gap" in reason
+
+    def test_all_dot_gaps_is_unusable(self):
+        reason = unusable_reason("." * 100)
+        assert reason is not None
+        assert "gap" in reason
+
+    def test_empty_sequence_is_unusable(self):
+        reason = unusable_reason("")
+        assert reason is not None
+        assert "empty" in reason
+
+    def test_all_n_is_unusable(self):
+        reason = unusable_reason("N" * 100)
+        assert reason is not None
+        assert "ambiguous" in reason
+
+    def test_only_ambiguity_codes_is_unusable(self):
+        reason = unusable_reason("RYKMSWRYKM")
+        assert reason is not None
+        assert "ambiguous" in reason
+
+
+class TestItemizeSequences:
+    def _run(self, tmp_path, content):
+        src = tmp_path / "in.fasta"
+        src.write_text(content, encoding="utf-8")
+        fasta = tmp_path / "out.fasta"
+        mapping = tmp_path / "map.tsv"
+        excluded = tmp_path / "excluded.tsv"
+        kept, skipped = itemize_sequences(src, fasta, mapping, excluded)
+        return {
+            "kept": kept,
+            "skipped": skipped,
+            "fasta": fasta.read_text(encoding="utf-8"),
+            "mapping": list(
+                csv.DictReader(mapping.open(newline=""), delimiter="\t")
+            ),
+            "excluded": list(
+                csv.DictReader(excluded.open(newline=""), delimiter="\t")
+            ),
+        }
+
+    def test_renames_to_sequential_ids(self, tmp_path):
+        r = self._run(tmp_path, ">first\nACGT\n>second\nTTTT\n")
+        assert r["kept"] == 2
+        assert r["skipped"] == 0
+        assert [m["id"] for m in r["mapping"]] == ["1", "2"]
+        assert [m["original_header"] for m in r["mapping"]] == ["first", "second"]
+        assert r["excluded"] == []
+
+    def test_gaps_stripped_from_written_fasta(self, tmp_path):
+        r = self._run(tmp_path, ">s1\nACGT----ACGT\n>s2\nAC..GT\n")
+        assert "-" not in r["fasta"]
+        assert "." not in r["fasta"]
+        assert "ACGTACGT" in r["fasta"]
+        assert "ACGT\n" in r["fasta"] or "ACGT" in r["fasta"]
+
+    def test_all_gap_record_excluded_from_fasta(self, tmp_path):
+        r = self._run(tmp_path, ">good\nACGTACGT\n>bad\n" + "-" * 60 + "\n")
+        assert r["kept"] == 1
+        assert r["skipped"] == 1
+        assert ">1" in r["fasta"]
+        assert ">2" not in r["fasta"]
+
+    def test_excluded_record_still_present_in_mapping(self, tmp_path):
+        r = self._run(tmp_path, ">good\nACGTACGT\n>bad\n" + "-" * 60 + "\n")
+        assert [m["original_header"] for m in r["mapping"]] == ["good", "bad"]
+
+    def test_ids_stay_stable_when_a_record_is_excluded(self, tmp_path):
+        content = ">a\nACGT\n>b\n" + "-" * 20 + "\n>c\nTTTT\n"
+        r = self._run(tmp_path, content)
+        ids = {m["original_header"]: m["id"] for m in r["mapping"]}
+        assert ids == {"a": "1", "b": "2", "c": "3"}
+        assert ">1" in r["fasta"]
+        assert ">3" in r["fasta"]
+        assert ">2" not in r["fasta"]
+
+    def test_excluded_tsv_records_id_header_reason_and_length(self, tmp_path):
+        r = self._run(tmp_path, ">good\nACGT\n>bad\n" + "-" * 60 + "\n")
+        assert len(r["excluded"]) == 1
+        row = r["excluded"][0]
+        assert row["id"] == "2"
+        assert row["original_header"] == "bad"
+        assert "gap" in row["reason"]
+        assert row["length"] == "60"
+
+    def test_all_n_record_excluded(self, tmp_path):
+        r = self._run(tmp_path, ">good\nACGT\n>alln\n" + "N" * 40 + "\n")
+        assert r["skipped"] == 1
+        assert "ambiguous" in r["excluded"][0]["reason"]
+
+    def test_every_sequence_unusable_yields_empty_fasta(self, tmp_path):
+        r = self._run(tmp_path, ">a\n" + "-" * 30 + "\n>b\n" + "N" * 30 + "\n")
+        assert r["kept"] == 0
+        assert r["skipped"] == 2
+        assert r["fasta"].strip() == ""
+        assert len(r["excluded"]) == 2
+
+    def test_excluded_tsv_has_header_when_nothing_excluded(self, tmp_path):
+        r = self._run(tmp_path, ">a\nACGT\n")
+        excluded_text = (tmp_path / "excluded.tsv").read_text(encoding="utf-8")
+        assert "original_header" in excluded_text
+        assert r["excluded"] == []
+
+
+# ── post_process_nextclade: excluded (unusable) sequences ─────────────────────
+
+from viralqc.scripts.python.post_process_nextclade import (
+    TARGET_COLUMNS,
+    UNUSABLE_SEQUENCE_STATUS,
+    create_excluded_df,
+    _write_csv_tsv_output,
+)
+
+
+class TestCreateExcludedDf:
+    def _write_excluded(self, tmp_path, rows):
+        p = tmp_path / "excluded_sequences.tsv"
+        with p.open("w", newline="", encoding="utf-8") as fh:
+            w = csv.DictWriter(
+                fh, fieldnames=["id", "original_header", "reason", "length"],
+                delimiter="\t",
+            )
+            w.writeheader()
+            for r in rows:
+                w.writerow(r)
+        return p
+
+    def test_status_column_is_part_of_schema(self):
+        assert "inputSequenceStatus" in TARGET_COLUMNS
+
+    def test_status_column_is_last_so_existing_order_is_preserved(self):
+        assert list(TARGET_COLUMNS.keys())[-1] == "inputSequenceStatus"
+
+    def test_returns_one_row_per_excluded_sequence(self, tmp_path):
+        p = self._write_excluded(
+            tmp_path,
+            [
+                {"id": "2", "original_header": "bad", "reason": "no usable sequence: only gap characters", "length": "60"},
+                {"id": "5", "original_header": "worse", "reason": "no usable sequence: only ambiguous bases", "length": "40"},
+            ],
+        )
+        df = create_excluded_df(p)
+        assert len(df) == 2
+        assert sorted(df["seqName"].astype(str).tolist()) == ["2", "5"]
+
+    def test_rows_are_marked_as_qc_failures(self, tmp_path):
+        p = self._write_excluded(
+            tmp_path,
+            [{"id": "2", "original_header": "bad", "reason": "no usable sequence: only gap characters", "length": "60"}],
+        )
+        df = create_excluded_df(p)
+        row = df.iloc[0]
+        assert row["inputSequenceStatus"] == UNUSABLE_SEQUENCE_STATUS
+        assert row["genomeQuality"] == "D"
+        assert row["virus"] == "Unclassified"
+        assert row["virus_species"] == "Unclassified"
+        assert row["segment"] == "Unsegmented"
+        assert float(row["coverage"]) == 0.0
+
+    def test_carries_every_target_column(self, tmp_path):
+        p = self._write_excluded(
+            tmp_path,
+            [{"id": "1", "original_header": "bad", "reason": "no usable sequence: empty record", "length": "0"}],
+        )
+        df = create_excluded_df(p)
+        for col in TARGET_COLUMNS:
+            assert col in df.columns
+
+    def test_seqname_is_the_sanitized_id_for_later_remapping(self, tmp_path):
+        p = self._write_excluded(
+            tmp_path,
+            [{"id": "7", "original_header": "orig header", "reason": "no usable sequence: only gap characters", "length": "9"}],
+        )
+        df = create_excluded_df(p)
+        assert df.iloc[0]["seqName"] == "7"
+
+    def test_missing_file_yields_empty_dataframe(self, tmp_path):
+        df = create_excluded_df(tmp_path / "does_not_exist.tsv")
+        assert df.empty
+
+    def test_header_only_file_yields_empty_dataframe(self, tmp_path):
+        p = self._write_excluded(tmp_path, [])
+        df = create_excluded_df(p)
+        assert df.empty
+
+
+class TestWriteOutputWithOnlyExcludedSequences:
+    """An input whose every sequence is unusable must still produce a valid results file."""
+
+    def _excluded_df(self, tmp_path, ids):
+        p = tmp_path / "excluded_sequences.tsv"
+        with p.open("w", newline="", encoding="utf-8") as fh:
+            w = csv.DictWriter(
+                fh, fieldnames=["id", "original_header", "reason", "length"],
+                delimiter="\t",
+            )
+            w.writeheader()
+            for i in ids:
+                w.writerow({
+                    "id": str(i),
+                    "original_header": f"seq{i}",
+                    "reason": "no usable sequence: only gap characters",
+                    "length": "60",
+                })
+        return create_excluded_df(p)
+
+    def test_tsv_written_with_header_when_there_are_no_other_rows(self, tmp_path):
+        out = tmp_path / "results.tsv"
+        excluded = self._excluded_df(tmp_path, [1, 2])
+        _write_csv_tsv_output(
+            iter([]),
+            None,
+            set(),
+            out,
+            "tsv",
+            id_map={"1": "seqA", "2": "seqB"},
+            excluded_df=excluded,
+        )
+        assert out.exists()
+        lines = out.read_text(encoding="utf-8").strip().split("\n")
+        header = lines[0].split("\t")
+        assert header == list(TARGET_COLUMNS.keys())
+        assert len(lines) == 3
+
+    def test_original_headers_restored_in_output(self, tmp_path):
+        out = tmp_path / "results.tsv"
+        excluded = self._excluded_df(tmp_path, [1])
+        _write_csv_tsv_output(
+            iter([]),
+            None,
+            set(),
+            out,
+            "tsv",
+            id_map={"1": "ITpS_real_header"},
+            excluded_df=excluded,
+        )
+        rows = list(csv.DictReader(out.open(newline=""), delimiter="\t"))
+        assert rows[0]["seqName"] == "ITpS_real_header"
+        assert rows[0]["inputSequenceStatus"] == UNUSABLE_SEQUENCE_STATUS
