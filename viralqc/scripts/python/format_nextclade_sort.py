@@ -1,7 +1,49 @@
 from argparse import ArgumentParser
 from pathlib import Path
+from sys import stderr
 from yaml import safe_load
 from pandas import DataFrame, isna, read_csv, concat
+from pandas.errors import EmptyDataError
+
+# Schema of a nextclade sort results table, with the dtypes needed downstream.
+NEXTCLADE_SORT_DTYPES = {
+    "index": "Int64",
+    "seqName": str,
+    "dataset": str,
+    "score": "Float64",
+    "numHits": "Int64",
+}
+NEXTCLADE_SORT_COLUMNS = ["index", "seqName", "dataset", "score", "numHits"]
+
+
+def read_nextclade_sort_tsv(tsv_file: Path) -> DataFrame:
+    """
+    Read a nextclade sort results table, tolerating an empty file.
+
+    Handed a FASTA with no records, nextclade sort writes a zero-byte file with
+    no header at all and still exits 0. That happens whenever every input
+    sequence was excluded for holding no usable base, and read_csv raises
+    EmptyDataError on such a file.
+
+    Args:
+        tsv_file: Path to the nextclade sort results TSV file.
+
+    Returns:
+        The parsed table, or an empty table carrying the expected columns.
+    """
+    try:
+        return read_csv(tsv_file, sep="\t", dtype=NEXTCLADE_SORT_DTYPES)
+    except EmptyDataError:
+        # An empty table is expected when the sanitized FASTA held no records, but
+        # it would look identical if nextclade sort exited 0 after a truncated
+        # write. Leave a breadcrumb so the two are distinguishable afterwards.
+        print(
+            f"WARNING: {tsv_file} is empty and carries no header; treating it as "
+            "zero mapped sequences. This is expected only when no input sequence "
+            "reached nextclade sort.",
+            file=stderr,
+        )
+        return DataFrame(columns=NEXTCLADE_SORT_COLUMNS).astype(NEXTCLADE_SORT_DTYPES)
 
 
 def map_datasets_to_local_paths(
@@ -61,16 +103,8 @@ def format_nextclade_output(
     Returns:
         A DataFrame with added 'localDataset' and 'splittedFasta' columns.
     """
-    df = read_csv(
-        tsv_file,
-        sep="\t",
-        dtype={"seqName": str, "dataset": str, "score": "Float64", "numHits": "Int64"},
-    )
-    df_external = read_csv(
-        tsv_external_file,
-        sep="\t",
-        dtype={"seqName": str, "dataset": str, "score": "Float64", "numHits": "Int64"},
-    )
+    df = read_nextclade_sort_tsv(tsv_file)
+    df_external = read_nextclade_sort_tsv(tsv_external_file)
     df = concat([df, df_external], ignore_index=True)
     df = (
         df.sort_values(by="dataset", na_position="last")

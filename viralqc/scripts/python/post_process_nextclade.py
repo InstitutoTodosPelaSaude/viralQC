@@ -113,7 +113,17 @@ TARGET_COLUMNS = {
     "tbl_path": str,
     "dataset": str,
     "datasetVersion": str,
+    # Appended last on purpose: consumers that read results.tsv by column
+    # position keep working. Empty for every sequence that reached nextclade or
+    # BLAST; set for sequences excluded upstream for holding no usable base.
+    "inputSequenceStatus": str,
 }
+
+# Value written to inputSequenceStatus for sequences that itemize_sequences kept
+# out of the analysis because they carry no usable base. Kept as a single stable
+# string so results can be filtered programmatically; the per-sequence reason is
+# in excluded_sequences.tsv.
+UNUSABLE_SEQUENCE_STATUS = "no usable sequence"
 
 
 DEFAULT_PRIVATE_MUTATION_TOTAL_THRESHOLD = 10
@@ -144,6 +154,7 @@ CATEGORICAL_COLUMNS = [
     "clade_display",
     "dataset",
     "datasetVersion",
+    "inputSequenceStatus",
 ]
 
 # Clade/lineage designation columns. Read as strings so all-integer values
@@ -979,6 +990,77 @@ def create_unmapped_df(
         return final_df
 
 
+def create_excluded_df(excluded_sequences: Path) -> DataFrame:
+    """
+    Create a dataframe of sequences excluded from the analysis for holding no
+    usable base.
+
+    These sequences never reach nextclade sort, so they appear in neither the
+    nextclade results nor unmapped_sequences.txt. Without this dataframe they
+    would be missing from the results file entirely, silently reducing the row
+    count below the number of input sequences.
+
+    Args:
+        excluded_sequences: Path to the excluded_sequences.tsv file written by
+            itemize_sequences.
+
+    Returns:
+        A dataframe with one row per excluded sequence, flagged as a
+        quality-control failure. Empty when there is nothing to report.
+    """
+    # No path given: the caller is not tracking excluded sequences at all.
+    if not excluded_sequences:
+        return DataFrame()
+
+    # A path WAS given, so anything unreadable or malformed is abnormal. Failing
+    # loudly matches the standard _sanitize_dataframe sets for a missing required
+    # column: silently returning an empty frame here would drop every excluded
+    # sequence from the results with no trace, which is the exact failure this
+    # function exists to prevent.
+    if not os.path.exists(excluded_sequences):
+        raise FileNotFoundError(
+            f"ViralQC post-processing: excluded sequences file {excluded_sequences} "
+            "was passed but does not exist; sequences excluded for holding no "
+            "usable base would be missing from the results."
+        )
+
+    try:
+        excluded = read_csv(excluded_sequences, sep="\t", dtype=str)
+    except EmptyDataError as error:
+        raise ValueError(
+            f"ViralQC post-processing: excluded sequences file {excluded_sequences} "
+            "is empty and carries no header; itemize_sequences always writes one, "
+            "so the file is truncated or corrupted."
+        ) from error
+
+    if "id" not in excluded.columns:
+        raise KeyError(
+            f"ViralQC post-processing: excluded sequences file {excluded_sequences} "
+            f"has no 'id' column (found {list(excluded.columns)}); it is corrupted."
+        )
+
+    # Header present with no data rows is the normal case: nothing was excluded.
+    if excluded.empty:
+        return DataFrame()
+
+    # seqName carries the sanitized numeric id so the frame flows through the
+    # same _map_ids step as every other frame and is written under the original
+    # header.
+    df = DataFrame({"seqName": excluded["id"].astype(str)})
+
+    _fill_missing_columns(df, TARGET_COLUMNS)
+
+    df["virus"] = "Unclassified"
+    df["virus_species"] = "Unclassified"
+    df["segment"] = "Unsegmented"
+    df["coverage"] = 0.0
+    df["genomeQuality"] = "D"
+    df["inputSequenceStatus"] = UNUSABLE_SEQUENCE_STATUS
+
+    optimize_dataframe_memory(df)
+    return df.loc[:, ~df.columns.duplicated()]
+
+
 def _sanitize_dataframe(df: DataFrame) -> DataFrame:
     """
     Sanitize and prepare dataframe for output (removes duplicates, casts types, cleans data).
@@ -1163,6 +1245,49 @@ def _format_json_columns(df: DataFrame) -> None:
             )
 
 
+def _finalize_synthesised_frame(
+    df: DataFrame,
+    id_map: dict = None,
+    reverse_id_map: dict = None,
+    gff_per_sample_dir: Path | None = None,
+    tbl_per_sample_dir: Path | None = None,
+) -> DataFrame:
+    """
+    Apply the ID restoration, annotation-path and schema handling used for
+    nextclade frames to a frame synthesised by ViralQC (unmapped or excluded
+    sequences).
+
+    Args:
+        df: Frame whose seqName column still holds sanitized numeric ids.
+        id_map: Dictionary for ID mapping (numeric id -> original header).
+        reverse_id_map: Dictionary mapping original header to numeric id.
+        gff_per_sample_dir: Path to the gff_files/per_sample/ directory.
+        tbl_per_sample_dir: Path to the tbl_files/per_sample/ directory.
+
+    Returns:
+        The sanitized frame, ready to be written.
+    """
+    if id_map:
+        df = _map_ids(df, id_map)
+    add_annotation_paths(
+        df, reverse_id_map or {}, gff_per_sample_dir, tbl_per_sample_dir
+    )
+    return _sanitize_dataframe(df)
+
+
+def _empty_results_frame() -> DataFrame:
+    """
+    Build an empty frame carrying the full output schema.
+
+    Used so a run whose sequences all failed still produces a readable results
+    file with a header rather than no file at all.
+
+    Returns:
+        An empty dataframe with every target column.
+    """
+    return DataFrame(columns=list(TARGET_COLUMNS.keys()))
+
+
 def _write_json_output(
     df_iterator: Iterator[DataFrame],
     unmapped_df: DataFrame,
@@ -1172,6 +1297,7 @@ def _write_json_output(
     reverse_id_map: dict = None,
     gff_per_sample_dir: Path | None = None,
     tbl_per_sample_dir: Path | None = None,
+    excluded_df: DataFrame = None,
 ) -> None:
     """
     Write all dataframes to JSON output file.
@@ -1185,6 +1311,8 @@ def _write_json_output(
         reverse_id_map: Dictionary mapping original header to numeric id.
         gff_per_sample_dir: Path to the gff_files/per_sample/ directory.
         tbl_per_sample_dir: Path to the tbl_files/per_sample/ directory.
+        excluded_df: Optional dataframe of sequences excluded for holding no
+            usable base.
     """
     all_data = []
 
@@ -1202,16 +1330,34 @@ def _write_json_output(
     if unmapped_df is not None and not unmapped_df.empty:
         unmapped_df = _filter_unmapped_sequences(unmapped_df, processed_seq_names)
         if not unmapped_df.empty:
-            if id_map:
-                unmapped_df = _map_ids(unmapped_df, id_map)
-            add_annotation_paths(
-                unmapped_df,
-                reverse_id_map or {},
+            all_data.append(
+                _finalize_synthesised_frame(
+                    unmapped_df,
+                    id_map,
+                    reverse_id_map,
+                    gff_per_sample_dir,
+                    tbl_per_sample_dir,
+                )
+            )
+
+    if excluded_df is not None and not excluded_df.empty:
+        # Cannot collide inside the workflow (excluded records never enter the
+        # sanitized FASTA, so nextclade never sees them), but this script is also a
+        # standalone CLI where a stale --excluded-sequences file would duplicate rows.
+        excluded_df = _filter_unmapped_sequences(excluded_df, processed_seq_names)
+    if excluded_df is not None and not excluded_df.empty:
+        all_data.append(
+            _finalize_synthesised_frame(
+                excluded_df,
+                id_map,
+                reverse_id_map,
                 gff_per_sample_dir,
                 tbl_per_sample_dir,
             )
-            final_unmapped = _sanitize_dataframe(unmapped_df)
-            all_data.append(final_unmapped)
+        )
+
+    if not all_data:
+        all_data.append(_empty_results_frame())
 
     combined_df = concat(all_data, ignore_index=True)
     combined_df = combined_df.loc[:, ~combined_df.columns.duplicated()]
@@ -1277,6 +1423,7 @@ def _write_csv_tsv_output(
     reverse_id_map: dict = None,
     gff_per_sample_dir: Path | None = None,
     tbl_per_sample_dir: Path | None = None,
+    excluded_df: DataFrame = None,
 ) -> None:
     """
     Write all dataframes to CSV/TSV output file incrementally.
@@ -1291,6 +1438,8 @@ def _write_csv_tsv_output(
         reverse_id_map: Dictionary mapping original header to numeric id.
         gff_per_sample_dir: Path to the gff_files/per_sample/ directory.
         tbl_per_sample_dir: Path to the tbl_files/per_sample/ directory.
+        excluded_df: Optional dataframe of sequences excluded for holding no
+            usable base.
     """
     first_chunk = True
 
@@ -1311,20 +1460,46 @@ def _write_csv_tsv_output(
     if unmapped_df is not None and not unmapped_df.empty:
         unmapped_df = _filter_unmapped_sequences(unmapped_df, processed_seq_names)
         if not unmapped_df.empty:
-            if id_map:
-                unmapped_df = _map_ids(unmapped_df, id_map)
-            add_annotation_paths(
+            final_unmapped = _finalize_synthesised_frame(
                 unmapped_df,
-                reverse_id_map or {},
+                id_map,
+                reverse_id_map,
                 gff_per_sample_dir,
                 tbl_per_sample_dir,
             )
-            final_unmapped = _sanitize_dataframe(unmapped_df)
+            # first_chunk, not a hardcoded False: when no nextclade frame was
+            # written this block owns the header and must create the file.
             _write_csv_tsv_chunk(
-                final_unmapped, output_file, output_format, False, False
+                final_unmapped, output_file, output_format, first_chunk, first_chunk
             )
+            first_chunk = False
             del final_unmapped
             gc.collect()
+
+    if excluded_df is not None and not excluded_df.empty:
+        # See the note in _write_json_output: guards the standalone-CLI case.
+        excluded_df = _filter_unmapped_sequences(excluded_df, processed_seq_names)
+    if excluded_df is not None and not excluded_df.empty:
+        final_excluded = _finalize_synthesised_frame(
+            excluded_df,
+            id_map,
+            reverse_id_map,
+            gff_per_sample_dir,
+            tbl_per_sample_dir,
+        )
+        _write_csv_tsv_chunk(
+            final_excluded, output_file, output_format, first_chunk, first_chunk
+        )
+        first_chunk = False
+        del final_excluded
+        gc.collect()
+
+    if first_chunk:
+        # Nothing at all to report: still emit a header-only file so the run
+        # ends with a readable result instead of a missing-output failure.
+        _write_csv_tsv_chunk(
+            _empty_results_frame(), output_file, output_format, True, True
+        )
 
 
 def write_combined_df(
@@ -1337,6 +1512,7 @@ def write_combined_df(
     reverse_id_map: dict = None,
     gff_per_sample_dir: Path | None = None,
     tbl_per_sample_dir: Path | None = None,
+    excluded_df: DataFrame = None,
 ) -> None:
     """
     Write dataframes incrementally to reduce memory usage.
@@ -1351,6 +1527,8 @@ def write_combined_df(
         reverse_id_map: Dictionary mapping original header to numeric id.
         gff_per_sample_dir: Path to the gff_files/per_sample/ directory.
         tbl_per_sample_dir: Path to the tbl_files/per_sample/ directory.
+        excluded_df: Optional dataframe of sequences excluded for holding no
+            usable base.
     """
     if output_format == "json":
         _write_json_output(
@@ -1362,6 +1540,7 @@ def write_combined_df(
             reverse_id_map,
             gff_per_sample_dir,
             tbl_per_sample_dir,
+            excluded_df=excluded_df,
         )
     else:
         _write_csv_tsv_output(
@@ -1374,6 +1553,7 @@ def write_combined_df(
             reverse_id_map,
             gff_per_sample_dir,
             tbl_per_sample_dir,
+            excluded_df=excluded_df,
         )
 
 
@@ -1420,6 +1600,16 @@ if __name__ == "__main__":
         help="Path to the ID mapping TSV file.",
     )
     parser.add_argument(
+        "--excluded-sequences",
+        type=Path,
+        required=False,
+        default=None,
+        help=(
+            "Path to the excluded_sequences.tsv file listing sequences kept out "
+            "of the analysis for holding no usable base."
+        ),
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         required=True,
@@ -1450,6 +1640,7 @@ if __name__ == "__main__":
     unmapped_df = create_unmapped_df(
         args.unmapped_sequences, args.blast_results, blast_metadata_df
     )
+    excluded_df = create_excluded_df(args.excluded_sequences)
 
     id_map = load_id_mapping(args.id_mapping) if args.id_mapping else {}
     reverse_id_map = {v: k for k, v in id_map.items()}
@@ -1482,4 +1673,5 @@ if __name__ == "__main__":
         reverse_id_map=reverse_id_map,
         gff_per_sample_dir=gff_per_sample_dir,
         tbl_per_sample_dir=tbl_per_sample_dir,
+        excluded_df=excluded_df,
     )

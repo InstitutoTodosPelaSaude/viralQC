@@ -146,6 +146,7 @@ output/
 │   ├── pp_nextclade.log
 │   └── extract_target_regions.log
 ├── results(.tsv,.csv,.json)                       # Final combined results (format: .tsv, .csv, or .json)
+├── excluded_sequences.tsv            # Input sequences with no usable base (columns: id, original_header, reason, length)
 ├── sequences_target_regions.bed      # BED file with target regions (includes 4 columns: seqname, start, end, region_name)
 └── sequences_target_regions.fasta    # FASTA file with extracted target region sequences
 ```

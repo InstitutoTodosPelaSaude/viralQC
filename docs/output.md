@@ -33,6 +33,7 @@ outputs/             # User specified output directory (e.g., --output-dir my_re
     │   ├── blast.log
     │   └── ...
     ├── results.tsv
+    ├── excluded_sequences.tsv
     ├── sequences_target_regions.bed
     └── sequences_target_regions.fasta
 ```
@@ -181,6 +182,42 @@ never coerced to `1.0`/`6.0`.
 | `privateNucMutations.totalLabeledSubstitutions` | Integer | Total known/cataloged private mutations |
 | `privateNucMutations.totalUnlabeledSubstitutions` | Integer | Total uncataloged private mutations |
 | `privateNucMutations.totalReversionSubstitutions` | Integer | Total reversions (mutations that revert to ancestral reference) |
+
+##### 8. Input Sequence Status
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `inputSequenceStatus` | String | Empty for every sequence that was analysed. Set to `no usable sequence` when the input record carried no usable base and was therefore excluded from Nextclade and BLAST |
+
+Added in **v1.2.0**. The column is appended after `datasetVersion`, so the order
+of every pre-existing column is unchanged.
+
+A sequence is considered to have no usable base when, after alignment gaps
+(`-` and `.`) are removed, it contains no `A`, `C`, `G`, `T` or `U` — that is,
+an all-gap record, an all-`N` record, a record made up only of ambiguity codes,
+or an empty record. Such sequences still get a row in `results.tsv`, with
+`genomeQuality` `D`, `coverage` `0` and `virus` `Unclassified`, so the row count
+always matches the number of input sequences. The per-sequence reason is in
+`excluded_sequences.tsv`.
+
+Note the difference from a merely unidentified sequence: a sequence that reached
+Nextclade and BLAST but matched nothing gets `virus` `Unclassified` with
+`genomeQuality` left **empty** (no quality was computed). A sequence excluded for
+holding no usable base gets `genomeQuality` `D` and a non-empty
+`inputSequenceStatus`. Filter on `inputSequenceStatus` to tell the two apart.
+
+### excluded_sequences.tsv
+
+Lists the input sequences that were excluded from the analysis for holding no
+usable base. Written on every run; contains only a header when nothing was
+excluded.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | Integer | Sanitized sequential ID assigned to the sequence |
+| `original_header` | String | Header as it appears in the input FASTA |
+| `reason` | String | Why the sequence was excluded. One of `no usable sequence: only gap characters`, `no usable sequence: only ambiguous bases`, `no usable sequence: empty record` |
+| `length` | Integer | Length of the record in the input file, before gap removal |
 
 **Note on output formats:**
 - **TSV/CSV**: All columns are strings or numeric values

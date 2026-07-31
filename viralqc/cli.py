@@ -1,8 +1,9 @@
 import typer, logging, colorlog
-from typing import Optional
+from typing import NoReturn, Optional
 from enum import Enum
 from viralqc.core.datasets import GetNextcladeDatasets, GetBlastDatabase
 from viralqc.core.run_analysis import RunAnalysis
+from viralqc.core.models import SnakemakeResponse
 from viralqc.core.defaults import (
     DEFAULT_SNK_FILE,
     DEFAULT_CONFIG_FILE,
@@ -63,6 +64,44 @@ def log_multiline(text: str):
             logger.debug(line.strip())
 
 
+FAILURE_LOG_TAIL_LINES = 30
+
+
+def fail(message: str, snakemake_response: SnakemakeResponse) -> NoReturn:
+    """
+    Report a failed Snakemake execution and exit with a non-zero status.
+
+    Snakemake log lines carry no INFO/WARNING/ERROR prefix, so log_multiline
+    routes them to logger.debug and they are invisible at the default level:
+    a failure used to surface as a bare one-line message with the actual cause
+    ('Error in rule ...') hidden. Echo the tail of the log and its path, then
+    exit non-zero so wrapping scripts and CI detect the failure.
+
+    Args:
+        message: Summary of what failed.
+        snakemake_response: Response of the failed execution.
+
+    Raises:
+        typer.Exit: Always, with code 1.
+    """
+    logger.error(message)
+
+    lines = [
+        line.rstrip()
+        for line in snakemake_response.format_log().splitlines()
+        if line.strip()
+    ]
+    if lines:
+        logger.error(f"Last {min(len(lines), FAILURE_LOG_TAIL_LINES)} log line(s):")
+        for line in lines[-FAILURE_LOG_TAIL_LINES:]:
+            logger.error(f"  {line}")
+
+    if snakemake_response.log_path:
+        logger.error(f"Full log: {snakemake_response.log_path}")
+
+    raise typer.Exit(code=1)
+
+
 # cli config
 app = typer.Typer()
 if __name__ == "__main__":
@@ -105,8 +144,7 @@ def get_nextclade_datasets(
             log_multiline(snakemake_response.format_log())
         logger.info("Nextclade public datasets successfully retrieved.")
     else:
-        log_multiline(snakemake_response.format_log())
-        logger.error("Failed to retrieve Nextclade public datasets.")
+        fail("Failed to retrieve Nextclade public datasets.", snakemake_response)
 
 
 def validate_date_format(value: Optional[str]) -> Optional[str]:
@@ -159,8 +197,7 @@ def get_blast_database(
             log_multiline(snakemake_response.format_log())
         logger.info("BLAST database created.")
     else:
-        log_multiline(snakemake_response.format_log())
-        logger.error("Failed to create BLAST database.")
+        fail("Failed to create BLAST database.", snakemake_response)
 
 
 class SortChoices(str, Enum):
@@ -261,5 +298,4 @@ def run(
         log_multiline(snakemake_response.format_log())
         logger.info("Nextclade run with success.")
     else:
-        log_multiline(snakemake_response.format_log())
-        logger.error("Failed to run nextclade.")
+        fail("Failed to run nextclade.", snakemake_response)

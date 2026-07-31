@@ -89,6 +89,8 @@ Tests pure-Python helper functions from each script. I/O-heavy entry points (`ma
 | `TestSanitizeName` / `TestLoadIdMapping` / `TestParseTblBlocks` | `split_tbl_by_sample` |
 | `TestCreateFastaPath` / `TestMapDatasetsToLocalPaths` / `TestWriteUnmappedSequences` | `format_nextclade_sort` |
 | `TestParseFastaLengths` / `TestCleanCdsName` | `jsonl_to_gff` |
+| `TestStripGaps` / `TestUnusableReason` / `TestItemizeSequences` | `itemize_sequences` |
+| `TestCreateExcludedDf` / `TestWriteOutputWithOnlyExcludedSequences` | `post_process_nextclade` |
 
 ## Writing new tests
 

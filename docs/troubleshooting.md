@@ -83,6 +83,44 @@ vqc run-from-fasta \
 2. Verify tag/branch exists
 3. Check GitHub connectivity: `ping github.com`
 
+## Problem 8: BLAST rejects a sequence as implausible data
+
+**Symptom:** the run stops at the `blast` rule and `output/logs/blast.log`
+contains:
+
+```
+BLAST query error: CFastaReader: Near line 2, there's a line that doesn't look like plausible data, but it's not marked as defline or comment.
+```
+
+**Cause:** `blastn`'s FASTA reader rejects the whole query file when a line looks
+implausible, and it does so on a sliding scale: measured against a real database
+it aborts once a line falls below roughly **one third** plausible residues — not
+only when a record is 100% gaps. So both an empty consensus exported as an
+all-gap alignment row and a heavily gapped partial genome could trigger it.
+Because the rule runs under `set -euo pipefail`, that one record aborted the
+whole run and discarded every other sequence's results.
+
+**Solution:** upgrade to **v1.2.0 or later**, which addresses this in two layers:
+
+1. Alignment gaps (`-` and `.`) are stripped from every sequence, and records
+   left with no usable base are excluded from Nextclade and BLAST, listed in
+   `excluded_sequences.tsv`, and reported in `results.tsv` with
+   `inputSequenceStatus` set to `no usable sequence`.
+2. A non-zero `blastn` exit is no longer fatal. It is logged to
+   `output/logs/blast.log` and the run continues with no BLAST hits, so other
+   padding conventions that ViralQC does not strip — NEXUS-style `?`, for
+   instance — degrade to "unidentified" instead of discarding the whole run.
+   Affected sequences appear as `Unclassified`.
+
+No change to the input file is required.
+
+On earlier versions, strip the gaps and drop the empty records before running
+(`-l 0` puts each sequence on a single line, which the filter relies on):
+
+```bash
+seqtk seq -A -l 0 input.fasta | awk '/^>/{h=$0; next} {gsub(/[-.]/,"",$0); if (length($0)>0) print h"\n"$0}' > cleaned.fasta
+```
+
 ## Getting Help
 
 - [GitHub Issues](https://github.com/InstitutoTodosPelaSaude/viralQC/issues)

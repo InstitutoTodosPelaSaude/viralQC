@@ -89,6 +89,8 @@ Testa funções auxiliares puras de cada script. Pontos de entrada com muita I/O
 | `TestSanitizeName` / `TestLoadIdMapping` / `TestParseTblBlocks` | `split_tbl_by_sample` |
 | `TestCreateFastaPath` / `TestMapDatasetsToLocalPaths` / `TestWriteUnmappedSequences` | `format_nextclade_sort` |
 | `TestParseFastaLengths` / `TestCleanCdsName` | `jsonl_to_gff` |
+| `TestStripGaps` / `TestUnusableReason` / `TestItemizeSequences` | `itemize_sequences` |
+| `TestCreateExcludedDf` / `TestWriteOutputWithOnlyExcludedSequences` | `post_process_nextclade` |
 
 ## Escrevendo novos testes
 
