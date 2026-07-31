@@ -1,5 +1,5 @@
 import typer, logging, colorlog
-from typing import Optional
+from typing import NoReturn, Optional
 from enum import Enum
 from viralqc.core.datasets import GetNextcladeDatasets, GetBlastDatabase
 from viralqc.core.run_analysis import RunAnalysis
@@ -67,7 +67,7 @@ def log_multiline(text: str):
 FAILURE_LOG_TAIL_LINES = 30
 
 
-def fail(message: str, snakemake_response: SnakemakeResponse) -> None:
+def fail(message: str, snakemake_response: SnakemakeResponse) -> NoReturn:
     """
     Report a failed Snakemake execution and exit with a non-zero status.
 

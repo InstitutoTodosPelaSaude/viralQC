@@ -35,7 +35,6 @@ from tests.conftest import (
     make_results_tsv,
 )
 
-
 # ── sanitize_seq_name ────────────────────────────────────────────────────────
 
 

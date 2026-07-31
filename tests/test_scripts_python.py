@@ -327,7 +327,12 @@ class TestCleanCdsName:
 
 # ── itemize_sequences ─────────────────────────────────────────────────────────
 
+from pandas import DataFrame
+
 from viralqc.scripts.python.itemize_sequences import (
+    REASON_EMPTY,
+    REASON_ONLY_AMBIGUOUS,
+    REASON_ONLY_GAPS,
     strip_gaps,
     unusable_reason,
     itemize_sequences,
@@ -424,8 +429,8 @@ class TestItemizeSequences:
         r = self._run(tmp_path, ">s1\nACGT----ACGT\n>s2\nAC..GT\n")
         assert "-" not in r["fasta"]
         assert "." not in r["fasta"]
-        assert "ACGTACGT" in r["fasta"]
-        assert "ACGT\n" in r["fasta"] or "ACGT" in r["fasta"]
+        seqs = [l for l in r["fasta"].splitlines() if not l.startswith(">")]
+        assert seqs == ["ACGTACGT", "ACGT"]
 
     def test_all_gap_record_excluded_from_fasta(self, tmp_path):
         r = self._run(tmp_path, ">good\nACGTACGT\n>bad\n" + "-" * 60 + "\n")
@@ -579,14 +584,36 @@ class TestCreateExcludedDf:
         df = create_excluded_df(p)
         assert df.iloc[0]["seqName"] == "7"
 
-    def test_missing_file_yields_empty_dataframe(self, tmp_path):
-        df = create_excluded_df(tmp_path / "does_not_exist.tsv")
-        assert df.empty
+    def test_no_path_yields_empty_dataframe(self):
+        """No path given: the caller is not tracking excluded sequences."""
+        assert create_excluded_df(None).empty
 
     def test_header_only_file_yields_empty_dataframe(self, tmp_path):
+        """Header with no rows is the normal 'nothing was excluded' case."""
         p = self._write_excluded(tmp_path, [])
         df = create_excluded_df(p)
         assert df.empty
+
+    # A path was given, so anything unreadable is abnormal and must not silently
+    # drop the excluded sequences from results.tsv.
+
+    def test_missing_file_raises(self, tmp_path):
+        with pytest.raises(FileNotFoundError, match="does not exist"):
+            create_excluded_df(tmp_path / "does_not_exist.tsv")
+
+    def test_zero_byte_file_raises(self, tmp_path):
+        p = tmp_path / "excluded_sequences.tsv"
+        p.write_text("")
+        with pytest.raises(ValueError, match="truncated or corrupted"):
+            create_excluded_df(p)
+
+    def test_missing_id_column_raises(self, tmp_path):
+        p = tmp_path / "excluded_sequences.tsv"
+        p.write_text(
+            "identifier\toriginal_header\treason\tlength\n2\tbad\tonly gaps\t9\n"
+        )
+        with pytest.raises(KeyError, match="no 'id' column"):
+            create_excluded_df(p)
 
 
 class TestWriteOutputWithOnlyExcludedSequences:
@@ -690,3 +717,273 @@ class TestReadNextcladeSortTsv:
         assert df.empty
         assert "localDataset" in df.columns
         assert "splittedFasta" in df.columns
+
+
+# ── the ungapped copy used for target-region extraction ───────────────────────
+
+
+class TestUngappedOutput:
+    """`extract_target_regions` applies nextclade-derived coordinates back to the
+    user's sequences. Those coordinates are in the gap-stripped frame, so the FASTA
+    they are applied to must be gap-stripped too, while keeping original headers."""
+
+    def _run(self, tmp_path, content):
+        src = tmp_path / "in.fasta"
+        src.write_text(content, encoding="utf-8")
+        ungapped = tmp_path / "ungapped.fasta"
+        itemize_sequences(
+            src,
+            tmp_path / "out.fasta",
+            tmp_path / "map.tsv",
+            tmp_path / "excluded.tsv",
+            ungapped,
+        )
+        recs, name = {}, None
+        for line in ungapped.read_text().splitlines():
+            if line.startswith(">"):
+                name = line[1:]
+                recs[name] = ""
+            else:
+                recs[name] += line
+        return recs
+
+    def test_keeps_original_headers(self, tmp_path):
+        recs = self._run(tmp_path, ">ITpS_real_header\nACGT--ACGT\n")
+        assert list(recs) == ["ITpS_real_header"]
+
+    def test_strips_gaps(self, tmp_path):
+        recs = self._run(tmp_path, ">s\nACGT--ACGT\n")
+        assert recs["s"] == "ACGTACGT"
+
+    def test_leading_gaps_removed_so_coordinates_line_up(self, tmp_path):
+        """A leading-gap-padded record previously yielded an extraction shifted by
+        the number of leading gaps, silently truncating the 3' end."""
+        recs = self._run(tmp_path, ">s\n" + "-" * 500 + "ACGTACGTAC\n")
+        assert recs["s"] == "ACGTACGTAC"
+        assert not recs["s"].startswith("-")
+
+    def test_contains_every_record_including_excluded(self, tmp_path):
+        recs = self._run(tmp_path, ">good\nACGT\n>bad\n" + "-" * 20 + "\n")
+        assert set(recs) == {"good", "bad"}
+        assert recs["bad"] == ""
+
+
+# ── writer: excluded rows combined with real results ─────────────────────────
+
+
+from viralqc.scripts.python.post_process_nextclade import _write_json_output
+
+
+def _nextclade_like_frame(ids, clade="2A"):
+    """Minimal stand-in for a processed nextclade frame."""
+    df = DataFrame({col: [""] * len(ids) for col in TARGET_COLUMNS})
+    df["seqName"] = [str(i) for i in ids]
+    df["clade"] = clade
+    df["coverage"] = 0.99
+    df["genomeQuality"] = "A"
+    df["virus"] = "DENV2"
+    return df
+
+
+class TestWriteOutputWithResultsAndExcluded:
+    """The shape of the original incident: many good sequences plus one unusable
+    one. The excluded row is appended AFTER real results, exercising the
+    append-without-header branch that the all-excluded tests never reach."""
+
+    def _excluded(self, tmp_path, ids):
+        p = tmp_path / "excluded_sequences.tsv"
+        with p.open("w", newline="", encoding="utf-8") as fh:
+            w = csv.DictWriter(
+                fh,
+                fieldnames=["id", "original_header", "reason", "length"],
+                delimiter="\t",
+            )
+            w.writeheader()
+            for i in ids:
+                w.writerow(
+                    {
+                        "id": str(i),
+                        "original_header": f"seq{i}",
+                        "reason": REASON_ONLY_GAPS,
+                        "length": "60",
+                    }
+                )
+        return create_excluded_df(p)
+
+    def test_tsv_row_count_equals_input_count(self, tmp_path):
+        out = tmp_path / "results.tsv"
+        id_map = {"1": "seqA", "2": "seq2", "3": "seqC"}
+        _write_csv_tsv_output(
+            iter([_nextclade_like_frame([1, 3])]),
+            None,
+            {"1", "3"},
+            out,
+            "tsv",
+            id_map=id_map,
+            excluded_df=self._excluded(tmp_path, [2]),
+        )
+        rows = list(csv.DictReader(out.open(newline=""), delimiter="\t"))
+        assert len(rows) == 3, "one row per input sequence"
+        assert {r["seqName"] for r in rows} == {"seqA", "seq2", "seqC"}
+
+    def test_header_written_exactly_once(self, tmp_path):
+        out = tmp_path / "results.tsv"
+        _write_csv_tsv_output(
+            iter([_nextclade_like_frame([1, 3])]),
+            None,
+            {"1", "3"},
+            out,
+            "tsv",
+            id_map={"1": "seqA", "2": "seq2", "3": "seqC"},
+            excluded_df=self._excluded(tmp_path, [2]),
+        )
+        text = out.read_text()
+        assert text.count("inputSequenceStatus") == 1
+        assert text.splitlines()[0].split("\t") == list(TARGET_COLUMNS.keys())
+
+    def test_only_the_excluded_row_is_flagged(self, tmp_path):
+        out = tmp_path / "results.tsv"
+        _write_csv_tsv_output(
+            iter([_nextclade_like_frame([1, 3])]),
+            None,
+            {"1", "3"},
+            out,
+            "tsv",
+            id_map={"1": "seqA", "2": "seq2", "3": "seqC"},
+            excluded_df=self._excluded(tmp_path, [2]),
+        )
+        rows = {
+            r["seqName"]: r
+            for r in csv.DictReader(out.open(newline=""), delimiter="\t")
+        }
+        assert rows["seq2"]["inputSequenceStatus"] == UNUSABLE_SEQUENCE_STATUS
+        assert rows["seq2"]["genomeQuality"] == "D"
+        assert rows["seqA"]["inputSequenceStatus"] == ""
+        assert rows["seqC"]["inputSequenceStatus"] == ""
+
+    def test_csv_format_also_carries_excluded_rows(self, tmp_path):
+        out = tmp_path / "results.csv"
+        _write_csv_tsv_output(
+            iter([_nextclade_like_frame([1])]),
+            None,
+            {"1"},
+            out,
+            "csv",
+            id_map={"1": "seqA", "2": "seq2"},
+            excluded_df=self._excluded(tmp_path, [2]),
+        )
+        rows = list(csv.DictReader(out.open(newline=""), delimiter=";"))
+        assert len(rows) == 2
+        assert any(r["inputSequenceStatus"] == UNUSABLE_SEQUENCE_STATUS for r in rows)
+
+    def test_json_format_also_carries_excluded_rows(self, tmp_path):
+        out = tmp_path / "results.json"
+        _write_json_output(
+            iter([_nextclade_like_frame([1])]),
+            None,
+            {"1"},
+            out,
+            {"1": "seqA", "2": "seq2"},
+            excluded_df=self._excluded(tmp_path, [2]),
+        )
+        payload = json.loads(out.read_text())
+        names = [row["seqName"] for row in payload["data"]]
+        assert set(names) == {"seqA", "seq2"}
+        flagged = [
+            row
+            for row in payload["data"]
+            if row.get("inputSequenceStatus") == UNUSABLE_SEQUENCE_STATUS
+        ]
+        assert len(flagged) == 1
+        assert flagged[0]["seqName"] == "seq2"
+
+    def test_unmapped_only_run_still_gets_a_header(self, tmp_path):
+        """Regression for the hardcoded is_first/is_header=False in the unmapped
+        block: with no nextclade frames it appended to a non-existent file."""
+        out = tmp_path / "results.tsv"
+        unmapped = DataFrame({col: [""] for col in TARGET_COLUMNS})
+        unmapped["seqName"] = ["5"]
+        unmapped["virus"] = ["Unclassified"]
+        _write_csv_tsv_output(
+            iter([]), unmapped, set(), out, "tsv", id_map={"5": "seqE"}
+        )
+        lines = out.read_text().strip().splitlines()
+        assert lines[0].split("\t") == list(TARGET_COLUMNS.keys())
+        assert len(lines) == 2
+
+
+# ── biopython parsing guarantees the fix relies on ───────────────────────────
+
+
+class TestInputParsingGuarantees:
+    """These are Biopython behaviours the gap-stripping fix depends on. Pinned so a
+    parser change cannot silently reintroduce implausible-residue lines."""
+
+    def _seq(self, tmp_path, raw_bytes):
+        src = tmp_path / "in.fasta"
+        src.write_bytes(raw_bytes)
+        out = tmp_path / "out.fasta"
+        itemize_sequences(src, out, tmp_path / "m.tsv", tmp_path / "e.tsv")
+        return "".join(l for l in out.read_text().splitlines() if not l.startswith(">"))
+
+    def test_interior_spaces_removed(self, tmp_path):
+        assert self._seq(tmp_path, b">s\nACGT ACGT\n") == "ACGTACGT"
+
+    def test_interior_tabs_removed(self, tmp_path):
+        assert self._seq(tmp_path, b">s\nACGT\tACGT\n") == "ACGTACGT"
+
+    def test_crlf_handled(self, tmp_path):
+        assert self._seq(tmp_path, b">s\r\nACGTACGT\r\n") == "ACGTACGT"
+
+    def test_gaps_then_ambiguity_is_unusable(self, tmp_path):
+        assert unusable_reason("----NNNN----") == REASON_ONLY_AMBIGUOUS
+
+
+# ── cli.fail ─────────────────────────────────────────────────────────────────
+
+import typer
+
+from viralqc.cli import fail
+from viralqc.cli import logger as cli_logger
+from viralqc.core.models import RunStatus, SnakemakeResponse
+
+
+class TestCliFail:
+    def _response(self, tmp_path, text="a\nb\nError in rule blast:\n"):
+        log = tmp_path / "run.snakemake.log"
+        log.write_text(text)
+        return SnakemakeResponse(
+            run_id="20260731T000000.0",
+            status=RunStatus.FAIL,
+            log_path=str(log),
+        )
+
+    def test_raises_exit_code_1(self, tmp_path):
+        with pytest.raises(typer.Exit) as exc:
+            fail("Failed to run nextclade.", self._response(tmp_path))
+        assert exc.value.exit_code == 1
+
+    def test_surfaces_log_tail_and_path_at_error_level(
+        self, tmp_path, caplog, monkeypatch
+    ):
+        response = self._response(tmp_path)
+        # viralqc.cli sets propagate = False, so caplog's root handler sees nothing
+        # unless propagation is restored for the duration of the test.
+        monkeypatch.setattr(cli_logger, "propagate", True)
+        with caplog.at_level("ERROR", logger="viralqc.cli"):
+            with pytest.raises(typer.Exit):
+                fail("Failed to run nextclade.", response)
+        logged = "\n".join(caplog.messages)
+        assert "Failed to run nextclade." in logged
+        assert "Error in rule blast:" in logged
+        assert response.log_path in logged
+
+    def test_missing_log_file_still_exits_1(self, tmp_path):
+        response = SnakemakeResponse(
+            run_id=None,
+            status=RunStatus.FAIL,
+            log_path=str(tmp_path / "absent.log"),
+        )
+        with pytest.raises(typer.Exit) as exc:
+            fail("Failed to run nextclade.", response)
+        assert exc.value.exit_code == 1

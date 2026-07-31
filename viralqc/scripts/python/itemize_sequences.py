@@ -1,17 +1,23 @@
 import argparse
 import sys
+from contextlib import ExitStack
 from pathlib import Path
 from Bio import SeqIO
 from Bio.Seq import Seq
 import csv
 
-# Alignment gap characters. A record made up entirely of these makes blastn
-# abort with "CFastaReader: ... doesn't look like plausible data"; because the
-# blast rule runs under `set -euo pipefail`, that single record kills the whole
-# workflow and discards the results of every other sequence. When mixed with
-# real bases the same characters are instead dropped silently by blastn (and
-# handled differently again by nextclade), so query coordinates and lengths stop
-# matching the input. Strip them here rather than relying on each tool.
+# Alignment gap characters. blastn's CFastaReader rejects the whole query file
+# once a line falls below roughly one third plausible residues (measured against a
+# real database: ~30% residues aborts, ~34% passes), so both an all-gap record and
+# a heavily gapped partial genome abort it. Under `set -euo pipefail` that killed
+# the workflow and discarded every other sequence's results. Below that threshold
+# the same characters are instead dropped silently by blastn, and handled
+# differently again by nextclade, so query coordinates and lengths stop matching
+# the input. Strip them here rather than relying on each tool's behaviour.
+#
+# This is not the only padding convention in the wild ('?' is used for missing
+# data and still aborts blastn), which is why the blast rule additionally treats a
+# non-zero blastn exit as non-fatal instead of relying on this list being complete.
 GAP_CHARACTERS = "-."
 
 # Characters that carry usable information. Ambiguity codes (N, R, Y, ...) are
@@ -19,6 +25,12 @@ GAP_CHARACTERS = "-."
 # dataset nor scored, so it is reported as a quality-control failure instead of
 # being sent through nextclade and BLAST.
 USABLE_BASES = frozenset("ACGTU")
+
+# Reason values written to the `reason` column of excluded_sequences.tsv. Part of
+# that file's contract, so they live here rather than inline.
+REASON_EMPTY = "no usable sequence: empty record"
+REASON_ONLY_GAPS = "no usable sequence: only gap characters"
+REASON_ONLY_AMBIGUOUS = "no usable sequence: only ambiguous bases"
 
 _GAP_TRANSLATION = str.maketrans("", "", GAP_CHARACTERS)
 
@@ -38,6 +50,15 @@ def parse_args():
         "--output-excluded",
         required=True,
         help="Output TSV file listing sequences excluded for having no usable bases",
+    )
+    parser.add_argument(
+        "--output-ungapped",
+        required=True,
+        help=(
+            "Output FASTA with gaps stripped but the ORIGINAL headers kept. Used "
+            "downstream wherever coordinates produced by nextclade must be applied "
+            "back to the user's sequences."
+        ),
     )
     return parser.parse_args()
 
@@ -67,14 +88,14 @@ def unusable_reason(sequence: str) -> str | None:
         when it holds at least one usable base.
     """
     if not sequence:
-        return "no usable sequence: empty record"
+        return REASON_EMPTY
 
     ungapped = strip_gaps(sequence)
     if not ungapped:
-        return "no usable sequence: only gap characters"
+        return REASON_ONLY_GAPS
 
     if not set(ungapped.upper()) & USABLE_BASES:
-        return "no usable sequence: only ambiguous bases"
+        return REASON_ONLY_AMBIGUOUS
 
     return None
 
@@ -84,6 +105,7 @@ def itemize_sequences(
     output_fasta: Path,
     output_mapping: Path,
     output_excluded: Path,
+    output_ungapped: Path | None = None,
 ) -> tuple[int, int]:
     """
     Rename sequences to sequential numeric IDs, strip alignment gaps and set
@@ -94,6 +116,9 @@ def itemize_sequences(
         output_fasta: Sanitized FASTA file, written without excluded records.
         output_mapping: Mapping TSV file, written with every input record.
         output_excluded: TSV file listing the excluded records and why.
+        output_ungapped: Optional FASTA with gaps stripped but original headers
+            kept. Every input record is written, so it is a faithful
+            gap-stripped copy of the input.
 
     Returns:
         Tuple of (sequences written, sequences excluded).
@@ -101,9 +126,15 @@ def itemize_sequences(
     kept = 0
     skipped = 0
 
-    with open(output_fasta, "w") as fasta_handle, open(
-        output_mapping, "w", newline=""
-    ) as map_handle, open(output_excluded, "w", newline="") as excluded_handle:
+    with ExitStack() as stack:
+        fasta_handle = stack.enter_context(open(output_fasta, "w"))
+        map_handle = stack.enter_context(open(output_mapping, "w", newline=""))
+        excluded_handle = stack.enter_context(open(output_excluded, "w", newline=""))
+        ungapped_handle = (
+            stack.enter_context(open(output_ungapped, "w"))
+            if output_ungapped is not None
+            else None
+        )
 
         mapping_writer = csv.DictWriter(
             map_handle, fieldnames=["id", "original_header"], delimiter="\t"
@@ -117,36 +148,44 @@ def itemize_sequences(
         )
         excluded_writer.writeheader()
 
-        with open(input_path, "r") as input_handle:
-            for i, record in enumerate(SeqIO.parse(input_handle, "fasta"), 1):
-                original_id = record.description
-                new_id = str(i)
+        input_handle = stack.enter_context(open(input_path, "r"))
+        for i, record in enumerate(SeqIO.parse(input_handle, "fasta"), 1):
+            original_id = record.description
+            new_id = str(i)
 
-                # IDs follow the input order and every record is mapped, even
-                # the excluded ones: post-processing needs the mapping to
-                # restore the original header of the results row it synthesises
-                # for each excluded sequence.
-                mapping_writer.writerow({"id": new_id, "original_header": original_id})
+            # IDs follow the input order and every record is mapped, even
+            # the excluded ones: post-processing needs the mapping to
+            # restore the original header of the results row it synthesises
+            # for each excluded sequence.
+            mapping_writer.writerow({"id": new_id, "original_header": original_id})
 
-                sequence = str(record.seq)
-                reason = unusable_reason(sequence)
-                if reason is not None:
-                    excluded_writer.writerow(
-                        {
-                            "id": new_id,
-                            "original_header": original_id,
-                            "reason": reason,
-                            "length": len(sequence),
-                        }
-                    )
-                    skipped += 1
-                    continue
+            sequence = str(record.seq)
+            ungapped = strip_gaps(sequence)
 
-                record.seq = Seq(strip_gaps(sequence))
-                record.id = new_id
-                record.description = ""
-                SeqIO.write(record, fasta_handle, "fasta")
-                kept += 1
+            # Written for every record, under the original header, so that
+            # coordinates nextclade derived from the gap-stripped sequence can be
+            # applied back to the user's sequences in the same frame.
+            if ungapped_handle is not None:
+                ungapped_handle.write(f">{original_id}\n{ungapped}\n")
+
+            reason = unusable_reason(sequence)
+            if reason is not None:
+                excluded_writer.writerow(
+                    {
+                        "id": new_id,
+                        "original_header": original_id,
+                        "reason": reason,
+                        "length": len(sequence),
+                    }
+                )
+                skipped += 1
+                continue
+
+            record.seq = Seq(ungapped)
+            record.id = new_id
+            record.description = ""
+            SeqIO.write(record, fasta_handle, "fasta")
+            kept += 1
 
     return kept, skipped
 
@@ -160,6 +199,7 @@ def main():
             Path(args.output_fasta),
             Path(args.output_mapping),
             Path(args.output_excluded),
+            Path(args.output_ungapped),
         )
     except Exception as e:
         print(f"Error processing sequences: {e}", file=sys.stderr)

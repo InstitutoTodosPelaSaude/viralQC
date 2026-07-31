@@ -1,11 +1,13 @@
 from argparse import ArgumentParser
 from pathlib import Path
+from sys import stderr
 from yaml import safe_load
 from pandas import DataFrame, isna, read_csv, concat
 from pandas.errors import EmptyDataError
 
 # Schema of a nextclade sort results table, with the dtypes needed downstream.
 NEXTCLADE_SORT_DTYPES = {
+    "index": "Int64",
     "seqName": str,
     "dataset": str,
     "score": "Float64",
@@ -32,6 +34,15 @@ def read_nextclade_sort_tsv(tsv_file: Path) -> DataFrame:
     try:
         return read_csv(tsv_file, sep="\t", dtype=NEXTCLADE_SORT_DTYPES)
     except EmptyDataError:
+        # An empty table is expected when the sanitized FASTA held no records, but
+        # it would look identical if nextclade sort exited 0 after a truncated
+        # write. Leave a breadcrumb so the two are distinguishable afterwards.
+        print(
+            f"WARNING: {tsv_file} is empty and carries no header; treating it as "
+            "zero mapped sequences. This is expected only when no input sequence "
+            "reached nextclade sort.",
+            file=stderr,
+        )
         return DataFrame(columns=NEXTCLADE_SORT_COLUMNS).astype(NEXTCLADE_SORT_DTYPES)
 
 

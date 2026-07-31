@@ -52,14 +52,16 @@ rule itemize_sequences:
     output:
         fasta = f"{parameters.output_dir}/sequences_sanitized.fasta",
         mapping = f"{parameters.output_dir}/identified_datasets/id_mapping.tsv",
-        excluded = f"{parameters.output_dir}/excluded_sequences.tsv"
+        excluded = f"{parameters.output_dir}/excluded_sequences.tsv",
+        ungapped = f"{parameters.output_dir}/sequences_ungapped.fasta"
     shell:
         """
         python {PKG_PATH}/scripts/python/itemize_sequences.py \
             --input {input.sequences} \
             --output-fasta {output.fasta} \
             --output-mapping {output.mapping} \
-            --output-excluded {output.excluded}
+            --output-excluded {output.excluded} \
+            --output-ungapped {output.ungapped}
         """
 
 _run_counters = {}
@@ -216,18 +218,16 @@ rule blast:
         if [ -s {input.unmapped_sequences} ]; then
             seqtk subseq {input.sequences} {input.unmapped_sequences} > {params.output_dir}/blast_results/unmapped_sequences.fasta 2>>{log}
 
-            # blastn aborts on a record holding no base at all, which under
-            # `set -euo pipefail` would kill the whole workflow. itemize_sequences
-            # already keeps such records out of the sanitized FASTA; this guard
-            # keeps the rule safe if an empty query set ever reaches it.
-            if ! grep -qE '^[^>[:space:]]*[ACGTUacgtu]' {params.output_dir}/blast_results/unmapped_sequences.fasta; then
-                echo "No unmapped sequence carries a usable base; skipping blastn." >>{log}
-                touch {output.viruses_identified}
-                rm -f {params.output_dir}/blast_results/unmapped_sequences.fasta
-                exit 0
-            fi
-
-            blastn \
+            # blastn's CFastaReader rejects a whole query file when any record
+            # looks implausible, and it does so on a sliding scale: measured
+            # against the real database it aborts once a line falls below roughly
+            # one third plausible residues, not only when a record is 100% gaps.
+            # itemize_sequences removes the records this pipeline knows about, but
+            # other padding conventions exist (NEXUS-style '?' still aborts), so
+            # do not let blastn's exit code be fatal. Degrading to "no BLAST hits"
+            # keeps every other sequence's results; aborting would discard them
+            # all, which is the failure this guard exists to prevent.
+            if ! blastn \
                 -query {params.output_dir}/blast_results/unmapped_sequences.fasta \
                 -db {input.blast_database} \
                 -out {output.viruses_identified} \
@@ -238,7 +238,13 @@ rule blast:
                 -num_threads {threads} \
                 -outfmt "6 qseqid qlen sseqid slen qstart qend sstart send evalue bitscore pident qcovs qcovhsp" \
                 -max_hsps 1 \
-                -max_target_seqs 1 2>>{log}
+                -max_target_seqs 1 2>>{log}; then
+
+                MSG="WARNING: blastn exited non-zero; see {log}. Continuing with no BLAST hits so the rest of the run is preserved. Affected sequences are reported as Unclassified in the results file."
+                echo "$MSG" >>{log}
+                echo "$MSG" >&2
+                : > {output.viruses_identified}
+            fi
 
             rm {params.output_dir}/blast_results/unmapped_sequences.fasta 2>>{log}
         else
@@ -496,7 +502,11 @@ rule extract_target_regions:
     message:
         "Extracts the regions marked as good"
     input:
-        sequences = parameters.sequences_fasta,
+        # The gap-stripped copy, NOT the original input: the BED coordinates come
+        # from nextclade, which saw the gap-stripped sequences, so extracting from
+        # the still-gapped original would silently return gap characters and
+        # truncate the 3' end by the number of leading gaps.
+        sequences = rules.itemize_sequences.output.ungapped,
         post_processed_data = rules.post_process_nextclade.output.output_file,
         id_mapping = rules.itemize_sequences.output.mapping
     params:
@@ -524,5 +534,6 @@ rule extract_target_regions:
         
         # Clean up intermediate files
         rm -rf {parameters.output_dir}/sequences_sanitized.fasta
+        rm -rf {parameters.output_dir}/sequences_ungapped.fasta
         find {parameters.output_dir}/identified_datasets/ -mindepth 1 -type d -exec rm -rf {{}} +
         """

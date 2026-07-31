@@ -1008,15 +1008,39 @@ def create_excluded_df(excluded_sequences: Path) -> DataFrame:
         A dataframe with one row per excluded sequence, flagged as a
         quality-control failure. Empty when there is nothing to report.
     """
-    if not excluded_sequences or not os.path.exists(excluded_sequences):
+    # No path given: the caller is not tracking excluded sequences at all.
+    if not excluded_sequences:
         return DataFrame()
+
+    # A path WAS given, so anything unreadable or malformed is abnormal. Failing
+    # loudly matches the standard _sanitize_dataframe sets for a missing required
+    # column: silently returning an empty frame here would drop every excluded
+    # sequence from the results with no trace, which is the exact failure this
+    # function exists to prevent.
+    if not os.path.exists(excluded_sequences):
+        raise FileNotFoundError(
+            f"ViralQC post-processing: excluded sequences file {excluded_sequences} "
+            "was passed but does not exist; sequences excluded for holding no "
+            "usable base would be missing from the results."
+        )
 
     try:
         excluded = read_csv(excluded_sequences, sep="\t", dtype=str)
-    except EmptyDataError:
-        return DataFrame()
+    except EmptyDataError as error:
+        raise ValueError(
+            f"ViralQC post-processing: excluded sequences file {excluded_sequences} "
+            "is empty and carries no header; itemize_sequences always writes one, "
+            "so the file is truncated or corrupted."
+        ) from error
 
-    if excluded.empty or "id" not in excluded.columns:
+    if "id" not in excluded.columns:
+        raise KeyError(
+            f"ViralQC post-processing: excluded sequences file {excluded_sequences} "
+            f"has no 'id' column (found {list(excluded.columns)}); it is corrupted."
+        )
+
+    # Header present with no data rows is the normal case: nothing was excluded.
+    if excluded.empty:
         return DataFrame()
 
     # seqName carries the sanitized numeric id so the frame flows through the
@@ -1317,6 +1341,11 @@ def _write_json_output(
             )
 
     if excluded_df is not None and not excluded_df.empty:
+        # Cannot collide inside the workflow (excluded records never enter the
+        # sanitized FASTA, so nextclade never sees them), but this script is also a
+        # standalone CLI where a stale --excluded-sequences file would duplicate rows.
+        excluded_df = _filter_unmapped_sequences(excluded_df, processed_seq_names)
+    if excluded_df is not None and not excluded_df.empty:
         all_data.append(
             _finalize_synthesised_frame(
                 excluded_df,
@@ -1447,6 +1476,9 @@ def _write_csv_tsv_output(
             del final_unmapped
             gc.collect()
 
+    if excluded_df is not None and not excluded_df.empty:
+        # See the note in _write_json_output: guards the standalone-CLI case.
+        excluded_df = _filter_unmapped_sequences(excluded_df, processed_seq_names)
     if excluded_df is not None and not excluded_df.empty:
         final_excluded = _finalize_synthesised_frame(
             excluded_df,
