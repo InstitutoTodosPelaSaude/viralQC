@@ -1012,16 +1012,24 @@ def _retry_helper():
 class TestDownloadRetry:
     """NCBI aborts transfers intermittently (e.g. 'Download error: stream error
     ... INTERNAL_ERROR; received from peer'), which used to fail rule
-    makeblast_db outright. Downloads now get three attempts."""
+    makeblast_db outright. Downloads now get 9 attempts, backing off
+    exponentially so repeated attempts do not get throttled by NCBI."""
 
     def _run(self, tmp_path, failures):
-        """Run `retry stub`, where stub fails its first `failures` calls."""
+        """Run `retry stub`, where stub fails its first `failures` calls.
+
+        Returns the process, the number of stub invocations, and the backoff
+        delays that were requested — `sleep` is shadowed, so the schedule is
+        recorded without the tests ever waiting.
+        """
         counter = tmp_path / "attempts"
         counter.write_text("0")
+        delays = tmp_path / "delays"
+        delays.write_text("")
         script = f"""
 set -euo pipefail
 {_retry_helper()}
-sleep() {{ :; }}  # no real waiting in tests
+sleep() {{ echo "$1" >> {delays}; }}  # record the backoff instead of waiting
 stub() {{
     n=$(( $(cat {counter}) + 1 ))
     echo "$n" > {counter}
@@ -1033,28 +1041,35 @@ stub() {{
 retry stub
 """
         proc = subprocess.run(["bash", "-c", script], capture_output=True, text=True)
-        return proc, int(counter.read_text())
+        waited = [int(d) for d in delays.read_text().split()]
+        return proc, int(counter.read_text()), waited
 
     def test_succeeds_after_two_failures(self, tmp_path):
-        proc, attempts = self._run(tmp_path, failures=2)
+        proc, attempts, waited = self._run(tmp_path, failures=2)
         assert proc.returncode == 0
         assert attempts == 3
-        assert "download attempt 1 of 3 failed." in proc.stderr
-        assert "download attempt 2 of 3 failed." in proc.stderr
+        assert waited == [2, 4]
+        assert "download attempt 1 of 9 failed." in proc.stderr
+        assert "download attempt 2 of 9 failed." in proc.stderr
         assert "giving up" not in proc.stderr
 
-    def test_gives_up_after_three_failures(self, tmp_path):
-        proc, attempts = self._run(tmp_path, failures=3)
+    def test_backoff_doubles_from_2_to_256_seconds(self, tmp_path):
+        _, _, waited = self._run(tmp_path, failures=9)
+        assert waited == [2, 4, 8, 16, 32, 64, 128, 256]
+
+    def test_gives_up_after_nine_attempts(self, tmp_path):
+        proc, attempts, _ = self._run(tmp_path, failures=9)
         assert proc.returncode != 0
-        assert attempts == 3
+        assert attempts == 9
         # the failing tool's own error is what reaches the user
         assert "stub: simulated NCBI failure" in proc.stderr
         assert "giving up" in proc.stderr
 
     def test_working_download_runs_once(self, tmp_path):
-        proc, attempts = self._run(tmp_path, failures=0)
+        proc, attempts, waited = self._run(tmp_path, failures=0)
         assert proc.returncode == 0
         assert attempts == 1
+        assert waited == []
         assert "failed" not in proc.stderr
 
     def test_both_downloads_are_wrapped(self):

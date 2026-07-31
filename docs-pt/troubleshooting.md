@@ -40,11 +40,14 @@ ERROR: Failed to create BLAST database.
 
 O NCBI interrompe transferências de forma intermitente, o que é mais provável em
 conexões lentas ou quando o download acontece a cada deploy. O `vqc get-blast-database`
-tenta cada download do NCBI até 3 vezes, aguardando 10 segundos entre as tentativas,
-de modo que uma única transferência interrompida não faz mais a execução falhar.
+repete cada download do NCBI 8 vezes, dobrando a espera entre as tentativas (2, 4, 8,
+16, 32, 64, 128 e 256 segundos), de modo que uma única transferência interrompida não
+faz mais a execução falhar e as tentativas seguintes recuam em vez de serem bloqueadas
+pelo NCBI. Por causa dessa espera progressiva, um download que nunca funciona demora
+cerca de 8 minutos a mais para reportar a falha.
 
 **Soluções:**
-1. Executar `vqc get-blast-database` novamente — falhar nas 3 tentativas geralmente
+1. Executar `vqc get-blast-database` novamente — falhar nas 9 tentativas geralmente
    indica que o NCBI está temporariamente indisponível, e não um problema no seu ambiente
 2. Verificar a conexão com a internet e eventuais proxies ou firewalls entre você e
    o `ftp.ncbi.nih.gov`

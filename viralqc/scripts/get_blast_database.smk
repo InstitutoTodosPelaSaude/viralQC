@@ -21,18 +21,23 @@ rule makeblast_db:
         mkdir -p {params.output_dir}/tmp_ncbi
 
         # NCBI transfers fail intermittently (HTTP/2 stream resets, FTP drops).
-        # Retry each download up to 3 times before giving up.
+        # Retry each download 8 times, doubling the wait between attempts
+        # (2, 4, 8, 16, 32, 64, 128, 256 seconds) so that repeated attempts back
+        # off instead of hammering NCBI and getting throttled.
         retry() {{
-            for attempt in 1 2 3; do
+            local delay=2
+            for attempt in 1 2 3 4 5 6 7 8 9; do
                 if "$@"; then
                     return 0
                 fi
-                echo "viralQC: download attempt $attempt of 3 failed." >&2
-                if [ "$attempt" -lt 3 ]; then
-                    sleep 10
+                echo "viralQC: download attempt $attempt of 9 failed." >&2
+                if [ "$attempt" -lt 9 ]; then
+                    echo "viralQC: retrying in $delay seconds..." >&2
+                    sleep "$delay"
+                    delay=$(( delay * 2 ))
                 fi
             done
-            echo "viralQC: download failed after 3 attempts, giving up." >&2
+            echo "viralQC: download failed after 9 attempts, giving up." >&2
             return 1
         }}
 
