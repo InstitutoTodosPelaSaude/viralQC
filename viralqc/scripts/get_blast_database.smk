@@ -20,9 +20,31 @@ rule makeblast_db:
         mkdir -p {params.output_dir}
         mkdir -p {params.output_dir}/tmp_ncbi
 
+        # NCBI transfers fail intermittently (HTTP/2 stream resets, FTP drops).
+        # Retry each download 8 times, doubling the wait between attempts
+        # (2, 4, 8, 16, 32, 64, 128, 256 seconds) so that repeated attempts back
+        # off instead of hammering NCBI and getting throttled.
+        retry() {{
+            local delay=2
+            for attempt in 1 2 3 4 5 6 7 8 9; do
+                if "$@"; then
+                    return 0
+                fi
+                echo "viralQC: download attempt $attempt of 9 failed." >&2
+                if [ "$attempt" -lt 9 ]; then
+                    echo "viralQC: retrying in $delay seconds..." >&2
+                    sleep "$delay"
+                    delay=$(( delay * 2 ))
+                fi
+            done
+            echo "viralQC: download failed after 9 attempts, giving up." >&2
+            return 1
+        }}
+
         # Download viral genomes from NCBI RefSeq
         cd {params.output_dir}/tmp_ncbi
-        datasets download virus genome taxon 10239 --refseq --include genome,annotation --fast-zip-validation
+        rm -f ncbi_dataset.zip
+        retry datasets download virus genome taxon 10239 --refseq --include genome,annotation --fast-zip-validation
         unzip -n ncbi_dataset.zip
 
         # Create metadata with release-date field
@@ -83,7 +105,7 @@ rule makeblast_db:
         mkdir -p tmp_taxdump
         cd tmp_taxdump
         rm -f taxdump.tar.gz*
-        wget ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz
+        retry wget -O taxdump.tar.gz ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz
         tar -zxvf taxdump.tar.gz
 
         mkdir -p $HOME/.taxonkit

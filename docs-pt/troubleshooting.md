@@ -31,6 +31,29 @@ ERROR: Failed to retrieve Nextclade public datasets
 2. Verificar caminho do dataset em `datasets.yml`
 3. Atualizar tag para versão mais recente
 
+**Sintoma:** uma transferência do NCBI é interrompida durante a criação do banco BLAST
+```
+Error: Download error: stream error: stream ID 3; INTERNAL_ERROR; received from peer
+Error in rule makeblast_db:
+ERROR: Failed to create BLAST database.
+```
+
+O NCBI interrompe transferências de forma intermitente, o que é mais provável em
+conexões lentas ou quando o download acontece a cada deploy. O `vqc get-blast-database`
+repete cada download do NCBI 8 vezes, dobrando a espera entre as tentativas (2, 4, 8,
+16, 32, 64, 128 e 256 segundos), de modo que uma única transferência interrompida não
+faz mais a execução falhar e as tentativas seguintes recuam em vez de serem bloqueadas
+pelo NCBI. Por causa dessa espera progressiva, um download que nunca funciona demora
+cerca de 8 minutos a mais para reportar a falha.
+
+**Soluções:**
+1. Executar `vqc get-blast-database` novamente — falhar nas 9 tentativas geralmente
+   indica que o NCBI está temporariamente indisponível, e não um problema no seu ambiente
+2. Verificar a conexão com a internet e eventuais proxies ou firewalls entre você e
+   o `ftp.ncbi.nih.gov`
+3. Se você reconstrói containers com frequência, mantenha o diretório de datasets em
+   um volume persistente para que ele seja baixado uma única vez, e não a cada início
+
 ## Problema 3: Banco BLAST não encontrado
 
 **Sintoma:**

@@ -3,6 +3,7 @@
 import csv
 import io
 import json
+import subprocess
 import textwrap
 from pathlib import Path
 
@@ -987,3 +988,91 @@ class TestCliFail:
         with pytest.raises(typer.Exit) as exc:
             fail("Failed to run nextclade.", response)
         assert exc.value.exit_code == 1
+
+
+# ── get_blast_database.smk: download retry ───────────────────────────────────
+
+from viralqc import GET_BLAST_DB_SNK_PATH
+
+
+def _retry_helper():
+    """Extract the retry() bash function from the shipped Snakefile.
+
+    Snakemake renders shell blocks through str.format, so braces are doubled in
+    the source; undoubling them yields the bash the rule actually runs. Reading
+    the real file (instead of a copy) means these tests also fail if the helper
+    is dropped from the rule.
+    """
+    text = GET_BLAST_DB_SNK_PATH.read_text()
+    start = text.index("retry() {{")
+    end = text.index("}}", start) + len("}}")
+    return text[start:end].replace("{{", "{").replace("}}", "}")
+
+
+class TestDownloadRetry:
+    """NCBI aborts transfers intermittently (e.g. 'Download error: stream error
+    ... INTERNAL_ERROR; received from peer'), which used to fail rule
+    makeblast_db outright. Downloads now get 9 attempts, backing off
+    exponentially so repeated attempts do not get throttled by NCBI."""
+
+    def _run(self, tmp_path, failures):
+        """Run `retry stub`, where stub fails its first `failures` calls.
+
+        Returns the process, the number of stub invocations, and the backoff
+        delays that were requested — `sleep` is shadowed, so the schedule is
+        recorded without the tests ever waiting.
+        """
+        counter = tmp_path / "attempts"
+        counter.write_text("0")
+        delays = tmp_path / "delays"
+        delays.write_text("")
+        script = f"""
+set -euo pipefail
+{_retry_helper()}
+sleep() {{ echo "$1" >> {delays}; }}  # record the backoff instead of waiting
+stub() {{
+    n=$(( $(cat {counter}) + 1 ))
+    echo "$n" > {counter}
+    if [ "$n" -le {failures} ]; then
+        echo "stub: simulated NCBI failure" >&2
+        return 1
+    fi
+}}
+retry stub
+"""
+        proc = subprocess.run(["bash", "-c", script], capture_output=True, text=True)
+        waited = [int(d) for d in delays.read_text().split()]
+        return proc, int(counter.read_text()), waited
+
+    def test_succeeds_after_two_failures(self, tmp_path):
+        proc, attempts, waited = self._run(tmp_path, failures=2)
+        assert proc.returncode == 0
+        assert attempts == 3
+        assert waited == [2, 4]
+        assert "download attempt 1 of 9 failed." in proc.stderr
+        assert "download attempt 2 of 9 failed." in proc.stderr
+        assert "giving up" not in proc.stderr
+
+    def test_backoff_doubles_from_2_to_256_seconds(self, tmp_path):
+        _, _, waited = self._run(tmp_path, failures=9)
+        assert waited == [2, 4, 8, 16, 32, 64, 128, 256]
+
+    def test_gives_up_after_nine_attempts(self, tmp_path):
+        proc, attempts, _ = self._run(tmp_path, failures=9)
+        assert proc.returncode != 0
+        assert attempts == 9
+        # the failing tool's own error is what reaches the user
+        assert "stub: simulated NCBI failure" in proc.stderr
+        assert "giving up" in proc.stderr
+
+    def test_working_download_runs_once(self, tmp_path):
+        proc, attempts, waited = self._run(tmp_path, failures=0)
+        assert proc.returncode == 0
+        assert attempts == 1
+        assert waited == []
+        assert "failed" not in proc.stderr
+
+    def test_both_downloads_are_wrapped(self):
+        shell = GET_BLAST_DB_SNK_PATH.read_text()
+        assert "retry datasets download virus genome taxon 10239" in shell
+        assert "retry wget -O taxdump.tar.gz ftp://" in shell
