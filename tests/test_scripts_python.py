@@ -408,12 +408,8 @@ class TestItemizeSequences:
             "kept": kept,
             "skipped": skipped,
             "fasta": fasta.read_text(encoding="utf-8"),
-            "mapping": list(
-                csv.DictReader(mapping.open(newline=""), delimiter="\t")
-            ),
-            "excluded": list(
-                csv.DictReader(excluded.open(newline=""), delimiter="\t")
-            ),
+            "mapping": list(csv.DictReader(mapping.open(newline=""), delimiter="\t")),
+            "excluded": list(csv.DictReader(excluded.open(newline=""), delimiter="\t")),
         }
 
     def test_renames_to_sequential_ids(self, tmp_path):
@@ -494,7 +490,8 @@ class TestCreateExcludedDf:
         p = tmp_path / "excluded_sequences.tsv"
         with p.open("w", newline="", encoding="utf-8") as fh:
             w = csv.DictWriter(
-                fh, fieldnames=["id", "original_header", "reason", "length"],
+                fh,
+                fieldnames=["id", "original_header", "reason", "length"],
                 delimiter="\t",
             )
             w.writeheader()
@@ -512,8 +509,18 @@ class TestCreateExcludedDf:
         p = self._write_excluded(
             tmp_path,
             [
-                {"id": "2", "original_header": "bad", "reason": "no usable sequence: only gap characters", "length": "60"},
-                {"id": "5", "original_header": "worse", "reason": "no usable sequence: only ambiguous bases", "length": "40"},
+                {
+                    "id": "2",
+                    "original_header": "bad",
+                    "reason": "no usable sequence: only gap characters",
+                    "length": "60",
+                },
+                {
+                    "id": "5",
+                    "original_header": "worse",
+                    "reason": "no usable sequence: only ambiguous bases",
+                    "length": "40",
+                },
             ],
         )
         df = create_excluded_df(p)
@@ -523,7 +530,14 @@ class TestCreateExcludedDf:
     def test_rows_are_marked_as_qc_failures(self, tmp_path):
         p = self._write_excluded(
             tmp_path,
-            [{"id": "2", "original_header": "bad", "reason": "no usable sequence: only gap characters", "length": "60"}],
+            [
+                {
+                    "id": "2",
+                    "original_header": "bad",
+                    "reason": "no usable sequence: only gap characters",
+                    "length": "60",
+                }
+            ],
         )
         df = create_excluded_df(p)
         row = df.iloc[0]
@@ -537,7 +551,14 @@ class TestCreateExcludedDf:
     def test_carries_every_target_column(self, tmp_path):
         p = self._write_excluded(
             tmp_path,
-            [{"id": "1", "original_header": "bad", "reason": "no usable sequence: empty record", "length": "0"}],
+            [
+                {
+                    "id": "1",
+                    "original_header": "bad",
+                    "reason": "no usable sequence: empty record",
+                    "length": "0",
+                }
+            ],
         )
         df = create_excluded_df(p)
         for col in TARGET_COLUMNS:
@@ -546,7 +567,14 @@ class TestCreateExcludedDf:
     def test_seqname_is_the_sanitized_id_for_later_remapping(self, tmp_path):
         p = self._write_excluded(
             tmp_path,
-            [{"id": "7", "original_header": "orig header", "reason": "no usable sequence: only gap characters", "length": "9"}],
+            [
+                {
+                    "id": "7",
+                    "original_header": "orig header",
+                    "reason": "no usable sequence: only gap characters",
+                    "length": "9",
+                }
+            ],
         )
         df = create_excluded_df(p)
         assert df.iloc[0]["seqName"] == "7"
@@ -568,17 +596,20 @@ class TestWriteOutputWithOnlyExcludedSequences:
         p = tmp_path / "excluded_sequences.tsv"
         with p.open("w", newline="", encoding="utf-8") as fh:
             w = csv.DictWriter(
-                fh, fieldnames=["id", "original_header", "reason", "length"],
+                fh,
+                fieldnames=["id", "original_header", "reason", "length"],
                 delimiter="\t",
             )
             w.writeheader()
             for i in ids:
-                w.writerow({
-                    "id": str(i),
-                    "original_header": f"seq{i}",
-                    "reason": "no usable sequence: only gap characters",
-                    "length": "60",
-                })
+                w.writerow(
+                    {
+                        "id": str(i),
+                        "original_header": f"seq{i}",
+                        "reason": "no usable sequence: only gap characters",
+                        "length": "60",
+                    }
+                )
         return create_excluded_df(p)
 
     def test_tsv_written_with_header_when_there_are_no_other_rows(self, tmp_path):

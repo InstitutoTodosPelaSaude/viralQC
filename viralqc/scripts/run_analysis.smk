@@ -465,7 +465,8 @@ rule post_process_nextclade:
         unmapped_sequences = f"{parameters.output_dir}/identified_datasets/unmapped_sequences.txt",
         config_file = parameters.config_file,
         blast_database_metadata = {parameters.blast_database_metadata},
-        id_mapping = rules.itemize_sequences.output.mapping
+        id_mapping = rules.itemize_sequences.output.mapping,
+        excluded_sequences = rules.itemize_sequences.output.excluded
     params:
         output_format = parameters.output_format,
         output_dir = parameters.output_dir
@@ -484,6 +485,7 @@ rule post_process_nextclade:
             --blast-results {input.blast_results} \
             --blast-metadata {input.blast_database_metadata} \
             --id-mapping {input.id_mapping} \
+            --excluded-sequences {input.excluded_sequences} \
             --config-file {input.config_file} \
             --output {output.output_file} \
             --output-format {params.output_format} \
