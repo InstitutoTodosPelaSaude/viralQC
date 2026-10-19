@@ -1,7 +1,7 @@
 nextclade_data:
   denv1:
     dataset: "community/v-gen-lab/dengue/denv1"
-    tag: "2025-09-09--12-13-13Z"
+    tag: "2026-10-06--17-37-18Z"
     virus_name: "Dengue virus type 1"
     virus_tax_id: 11053
     virus_species: "Orthoflavivirus denguei"
@@ -13,7 +13,7 @@ nextclade_data:
     private_mutation_total_threshold: 70
   denv2:
     dataset: "community/v-gen-lab/dengue/denv2"
-    tag: "2025-09-09--12-13-13Z"
+    tag: "2026-10-06--17-37-18Z"
     virus_name: "Dengue virus type 2"
     virus_tax_id: 11060
     virus_species: "Orthoflavivirus denguei"
@@ -25,7 +25,7 @@ nextclade_data:
     private_mutation_total_threshold: 105
   denv3:
     dataset: "community/v-gen-lab/dengue/denv3"
-    tag: "2025-09-09--12-13-13Z"
+    tag: "2026-10-06--17-37-18Z"
     virus_name: "Dengue virus type 3"
     virus_tax_id: 11069
     virus_species: "Orthoflavivirus denguei"
@@ -37,7 +37,7 @@ nextclade_data:
     private_mutation_total_threshold: 65
   denv4:
     dataset: "community/v-gen-lab/dengue/denv4"
-    tag: "2025-09-09--12-13-13Z"
+    tag: "2026-10-06--17-37-18Z"
     virus_name: "Dengue virus type 4"
     virus_tax_id: 11070
     virus_species: "Orthoflavivirus denguei"
